@@ -82,24 +82,9 @@
 #define LEDS_GREEN              0x40 /**< LED3 (Green)  -> PC2 */
 #define LEDS_ORANGE             0x80 /**< LED4 (Orange) -> PC3 */
 
-#if USB_SERIAL_CONF_ENABLE
-#define LEDS_CONF_ALL           14
-#define LEDS_RED                LEDS_ORANGE
-#else
-#define LEDS_CONF_ALL           15
-#define LEDS_RED                1 /**< LED1 (Red)    -> PC0 */
-#endif
 
 /* Notify various examples that we have LEDs */
 #define PLATFORM_HAS_LEDS       1
-/** @} */
-/*---------------------------------------------------------------------------*/
-/** \name USB configuration
- *
- * The USB pullup is driven by PC0 and is shared with LED1
- */
-#define USB_PULLUP_PORT         GPIO_C_NUM
-#define USB_PULLUP_PIN          0
 /** @} */
 /*---------------------------------------------------------------------------*/
 /** \name UART configuration
@@ -138,30 +123,16 @@
  * - BUTTON_DOWN -> PC7
  * @{
  */
-/** BUTTON_SELECT -> PA3 */
-#define BUTTON_SELECT_PORT      GPIO_A_NUM
-#define BUTTON_SELECT_PIN       3
-#define BUTTON_SELECT_VECTOR    NVIC_INT_GPIO_PORT_A
 
 /** BUTTON_LEFT -> PC4 */
-#define BUTTON_LEFT_PORT        GPIO_C_NUM
-#define BUTTON_LEFT_PIN         4
-#define BUTTON_LEFT_VECTOR      NVIC_INT_GPIO_PORT_C
+#define BUTTON_ONBOARD_PORT        GPIO_C_NUM
+#define BUTTON_ONBOARD_PIN         4
+#define BUTTON_ONBOARD_VECTOR      NVIC_INT_GPIO_PORT_C
 
-/** BUTTON_RIGHT -> PC5 */
-#define BUTTON_RIGHT_PORT       GPIO_C_NUM
-#define BUTTON_RIGHT_PIN        5
-#define BUTTON_RIGHT_VECTOR     NVIC_INT_GPIO_PORT_C
+#define BUTTON_LEFT_PORT        GPIO_B_NUM
+#define BUTTON_LEFT_PIN         3
+#define BUTTON_LEFT_VECTOR      NVIC_INT_GPIO_PORT_B
 
-/** BUTTON_UP -> PC6 */
-#define BUTTON_UP_PORT          GPIO_C_NUM
-#define BUTTON_UP_PIN           6
-#define BUTTON_UP_VECTOR        NVIC_INT_GPIO_PORT_C
-
-/** BUTTON_DOWN -> PC7 */
-#define BUTTON_DOWN_PORT        GPIO_C_NUM
-#define BUTTON_DOWN_PIN         7
-#define BUTTON_DOWN_VECTOR      NVIC_INT_GPIO_PORT_C
 
 /* Notify various examples that we have Buttons */
 #define PLATFORM_HAS_BUTTON     1
@@ -178,7 +149,7 @@
  */
 #define ADC_ALS_PWR_PORT        GPIO_A_NUM /**< ALS power GPIO control port */
 #define ADC_ALS_PWR_PIN         7 /**< ALS power GPIO control pin */
-#define ADC_ALS_OUT_PIN         6 /**< ALS output ADC input pin on port A */
+#define ADC_ALS_OUT_PIN         4 /**< ALS output ADC input pin on port A */
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**
@@ -225,7 +196,7 @@
  * \name Device string used on startup
  * @{
  */
-#define BOARD_STRING "TI SmartRF06 + cc2538EM"
+#define BOARD_STRING "SH dimmer"
 /** @} */
 
 #endif /* BOARD_H_ */

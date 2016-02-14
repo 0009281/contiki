@@ -48,14 +48,21 @@
 
 #define BUTTON_SENSOR "Button"
 
+#define BUTTON_SENSOR_VALUE_STATE    0
+#define BUTTON_SENSOR_VALUE_DURATION 1
+
+#define BUTTON_SENSOR_VALUE_RELEASED 0
+#define BUTTON_SENSOR_VALUE_PRESSED  1
+
+
 #define button_sensor button_select_sensor
-extern const struct sensors_sensor button_select_sensor;
 extern const struct sensors_sensor button_left_sensor;
-extern const struct sensors_sensor button_right_sensor;
-extern const struct sensors_sensor button_up_sensor;
-extern const struct sensors_sensor button_down_sensor;
+extern const struct sensors_sensor button_onboard_sensor;
 /*---------------------------------------------------------------------------*/
 #endif /* BUTTON_SENSOR_H_ */
+
+
+int dimming_time;
 
 /** \brief Common initialiser for all SmartRF Buttons */
 void button_sensor_init();
