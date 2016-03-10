@@ -150,7 +150,8 @@ main(void)
   gpio_init();
 
   leds_init();
-  fade(LEDS_YELLOW);
+  leds_off(LEDS_ALL);
+//  fade(LEDS_YELLOW);
 
   process_init();
 
@@ -226,7 +227,7 @@ main(void)
   autostart_start(autostart_processes);
 
   watchdog_start();
-  fade(LEDS_ORANGE);
+//  fade(LEDS_ORANGE);
 
   while(1) {
     uint8_t r;

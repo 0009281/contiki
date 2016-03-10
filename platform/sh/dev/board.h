@@ -78,7 +78,7 @@
 #undef LEDS_RED
 #undef LEDS_CONF_ALL
 
-#define LEDS_YELLOW             0x40 | 0x80 /**< LED2 (Yellow) -> PC1 */
+#define LEDS_YELLOW             0x2 | 0x80 /**< LED2 (Yellow) -> PC1 */
 #define LEDS_GREEN              0x40 /**< LED3 (Green)  -> PC2 */
 #define LEDS_ORANGE             0x80 /**< LED4 (Orange) -> PC3 */
 
