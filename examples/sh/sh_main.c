@@ -70,7 +70,7 @@ GPIO_SET_PIN(GPIO_C_BASE, 0x80);
 PROCESS(dimmer_process, "Dimming process");
 PROCESS(btn_process, "Button/Gpio process");
 PROCESS(current_sensor_process, "Current sensor process");
-AUTOSTART_PROCESSES(&dimmer_process, &btn_process, &current_sensor_process);
+AUTOSTART_PROCESSES(&dimmer_process, &btn_process);
 
 
 
@@ -89,7 +89,7 @@ uint32_t tt = 0x55AABBCC;
 
 //  PROCESS_YIELD();
 
-  printf("Hello, world\n");
+  printf("Beginning of Dimming process\n");
 
 //do {
 
@@ -379,7 +379,7 @@ PROCESS_THREAD(current_sensor_process, ev, data)
 	if (current_sensor_iteration==4096) {
 	    temp_current_sensor_value=sqrt(abs((pwr_sum/4096) - 1020)*0.005859375);
 
-          printf("Current sensor value = %ld.%03u A \n\r",  (long)(temp_current_sensor_value), (unsigned)((temp_current_sensor_value-floor(temp_current_sensor_value))*1000));
+          printf("Current sensor v2alue = %ld.%03u A \n\r",  (long)(temp_current_sensor_value), (unsigned)((temp_current_sensor_value-floor(temp_current_sensor_value))*1000));
 //          printf("Current sensor value = %ld.%03u A \n\r", /*current_sensor_value/4096*/ (long)sqrt(current_sensor_value/4096), (unsigned)sqrt(((current_sensor_value/4096-floor(current_sensor_value/4096))*1000)));
 //          printf("Current sensor value = %ld.%03u A \n\r", /*current_sensor_value/4096*/ (long)current_sensor_value/1000, (unsigned)((current_sensor_value/1000-floor(current_sensor_value/1000))*1000));
           printf("Max Iout = %d V\n\r, Average V = %d\n\r", current_sensor_value_max, pwr_sum/4096);
@@ -400,87 +400,102 @@ PROCESS_THREAD(current_sensor_process, ev, data)
 
   PROCESS_END();
 }
-
+/*---------------------------------------------------------------------------*/
 PROCESS_THREAD(btn_process, ev, data)
 {
-static uint32_t pwr;
-uint16_t j;
 
-  PROCESS_BEGIN();
-  
-  printf("Smart Home Dimmer Process\n\r");
+ static uint32_t pwr;
+ uint16_t j;
 
-pwr=0;
+ PROCESS_BEGIN();
 
-  while(1) {
+ printf("Beginning of Button process\n");
 
-//      etimer_set(&ett, CLOCK_SECOND*1);
-    PROCESS_YIELD();
+//pwr=0;
 
+ while(1) {
+  PROCESS_YIELD();
 
-//    if(ev == PROCESS_EVENT_TIMER) {
+  if(ev == sensors_event) {
 
-//      for (j=0;j<6600;j++)  pwr=pwr+als_sensor.value(0);
-
-//      printf("Ambient light sensor = %u raw\n\r", als_sensor.value(0));
-//      printf("Temperature = %d mC\n",  cc2538_temp_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED));
-
-//    }
-
-
-
-
-    if(ev == sensors_event) {
-
-      if(data == &button_onboard_sensor) {
-	printf("Onboard button: Pin %d, press duration %d clock ticks\n\r",
-                (&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_STATE),
-                (&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION));
-
-        if((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) < CLOCK_SECOND*0.7)
-	 {
-	    printf("Onboard button short button press!\n\r");
-//	     printf("REG[Software_control] = %lx \n\r", REG(GPIO_A_BASE+GPIO_AFSEL));
-//	     printf("REG[Input_control] = %lx \n\r", REG(GPIO_A_BASE+GPIO_DIR));
-//	     printf("REG[PA4 over] = %lx \n\r", REG(0x400D4090));
-//	     printf("Ambient light sensor = %d raw\n\r", als_sensor.value(0));
-
-	    //GPIO_SET_PIN(GPIO_C_BASE, 0x80);  
-//	    leds_toggle(LEDS_GREEN);
-	    if (!dimmer_command) {
-    		dimmer_command = DIMMER_TOGGLE;
-		process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, NULL);
-	    }
-	    else if (dimmer_command==DIMMER_CYCLE_DIMMING) {
-		dimmer_command=DIMMER_CYCLE_DIMMING_STOP;
-
-	    }
-
-        }
-        else if(((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3))
-	 {
-//	    GPIO_SET_PIN(GPIO_C_BASE, 0x80);  
-	    leds_toggle(LEDS_RED);
-            printf("Max Vout = %d V\n\r", (long)temp_current_sensor_value);
-	    temp_current_sensor_value=sqrt(temp_current_sensor_value/7)/0.275;
-            printf("Current sensor value = %ld.%03u A \n\r",  (long)temp_current_sensor_value, (unsigned)((temp_current_sensor_value-floor(temp_current_sensor_value))*1000));
-
-	    printf("Onboard button middle button press!\n\r");
-        }
-
-        else if((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3)
-	 {
-//	    GPIO_SET_PIN(GPIO_C_BASE, 0x80);  
-//	    leds_toggle(LEDS_ALL);
-	    dimmer_command = DIMMER_CYCLE_DIMMING;
-	    process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, NULL);
-	    printf("Onboard button long button press!\n\r");
-        }
-
-
+   if(data == &button_onboard_sensor) {
+    printf("Onboard button: Pin %d, press duration %d clock ticks\n\r", (&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_STATE), (&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION));
+    if((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) < CLOCK_SECOND*0.7) {
+     printf("Onboard button short press\n\r");
+     if (!dimmer_command) {
+      dimmer_command = DIMMER_TOGGLE;
+      process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, NULL);
+     }
+     else if (dimmer_command==DIMMER_CYCLE_DIMMING) {
+      dimmer_command=DIMMER_CYCLE_DIMMING_STOP;
+     }
     }
+    else if(((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
+     printf("Onboard button middle button press!\n\r");
     }
-  }
+    else if((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3)  {
+     printf("Onboard button long button press!\n\r");
+     dimmer_command = DIMMER_CYCLE_DIMMING;
+     process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, NULL);
+    }
+   } //button_onboard_sensor
+
+
+   else if(data == &button_GPIO0_sensor) {
+    printf("GPIO0 button: Pin = %d, press duration %d clock ticks\n\r", (&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_STATE), (&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION));
+
+    if((&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) < CLOCK_SECOND*0.7) {
+     printf("GPIO0 button short press\n\r");
+    }
+
+    else if(((&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
+     printf("GPIO0 button middle button press!\n\r");
+    }
+
+    else if((&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3) {
+     printf("GPIO0 button long button press!\n\r");
+    }
+   } //button_GPIO0_sensor
+
+
+   else if(data == &button_GPIO1_sensor) {
+    printf("GPIO1 button: Pin = %d, press duration %d clock ticks\n\r", (&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_STATE), (&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_DURATION));
+
+    if((&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) < CLOCK_SECOND*0.7) {
+     printf("GPIO1 button short press\n\r");
+    }
+
+    else if(((&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
+     printf("GPIO1 button middle button press!\n\r");
+    }
+
+    else if((&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3) {
+     printf("GPIO1 button long button press!\n\r");
+    }
+   } //button_GPIO1_sensor
+
+
+   else if(data == &button_GPIO2_sensor) {
+    printf("GPIO2 button: Pin = %d, press duration %d clock ticks\n\r", (&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_STATE), (&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_DURATION));
+
+    if((&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) < CLOCK_SECOND*0.7) {
+     printf("GPIO2 button short press\n\r");
+    }
+
+    else if(((&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
+     printf("GPIO2 button middle button press!\n\r");
+    }
+
+    else if((&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3) {
+     printf("GPIO2 button long button press!\n\r");
+    }
+   } //button_GPIO2_sensor
+
+
+
+
+    } //sensor_event
+  } //while
 
   PROCESS_END();
 

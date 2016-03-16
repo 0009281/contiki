@@ -45,26 +45,25 @@
 #include <stdint.h>
 #include <string.h>
 
-#define BUTTON_SELECT_PORT_BASE  GPIO_PORT_TO_BASE(BUTTON_SELECT_PORT)
-#define BUTTON_SELECT_PIN_MASK   GPIO_PIN_MASK(BUTTON_SELECT_PIN)
+#define AC_ZERO_DETECTOR_PORT_BASE    GPIO_PORT_TO_BASE(AC_ZERO_DETECTOR_PORT)
+#define AC_ZERO_DETECTOR_PIN_MASK     GPIO_PIN_MASK(AC_ZERO_DETECTOR_PIN)
 
-#define BUTTON_LEFT_PORT_BASE    GPIO_PORT_TO_BASE(BUTTON_LEFT_PORT)
-#define BUTTON_LEFT_PIN_MASK     GPIO_PIN_MASK(BUTTON_LEFT_PIN)
 
 #define BUTTON_ONBOARD_PORT_BASE    GPIO_PORT_TO_BASE(BUTTON_ONBOARD_PORT)
 #define BUTTON_ONBOARD_PIN_MASK     GPIO_PIN_MASK(BUTTON_ONBOARD_PIN)
 
-#define BUTTON_RIGHT_PORT_BASE   GPIO_PORT_TO_BASE(BUTTON_RIGHT_PORT)
-#define BUTTON_RIGHT_PIN_MASK    GPIO_PIN_MASK(BUTTON_RIGHT_PIN)
+#define BUTTON_GPIO0_PORT_BASE    GPIO_PORT_TO_BASE(BUTTON_GPIO0_PORT)
+#define BUTTON_GPIO0_PIN_MASK     GPIO_PIN_MASK(BUTTON_GPIO0_PIN)
 
-#define BUTTON_UP_PORT_BASE      GPIO_PORT_TO_BASE(BUTTON_UP_PORT)
-#define BUTTON_UP_PIN_MASK       GPIO_PIN_MASK(BUTTON_UP_PIN)
+#define BUTTON_GPIO1_PORT_BASE    GPIO_PORT_TO_BASE(BUTTON_GPIO1_PORT)
+#define BUTTON_GPIO1_PIN_MASK     GPIO_PIN_MASK(BUTTON_GPIO1_PIN)
 
-#define BUTTON_DOWN_PORT_BASE    GPIO_PORT_TO_BASE(BUTTON_DOWN_PORT)
-#define BUTTON_DOWN_PIN_MASK     GPIO_PIN_MASK(BUTTON_DOWN_PIN)
+#define BUTTON_GPIO2_PORT_BASE    GPIO_PORT_TO_BASE(BUTTON_GPIO2_PORT)
+#define BUTTON_GPIO2_PIN_MASK     GPIO_PIN_MASK(BUTTON_GPIO2_PIN)
+
 /*---------------------------------------------------------------------------*/
 static struct timer debouncetimer;
-static struct ctimer my_ct;
+static struct ctimer GPIO_callback_timer;
 static struct rtimer simistor_strob_rtimer, zero_detector_rtimer;
 static int count50=0;
 
@@ -75,7 +74,7 @@ struct btn_timer {
   clock_time_t duration;
 };
 
-static struct btn_timer onboard_timer;
+static struct btn_timer onboard_timer, GPIO0_timer, GPIO1_timer, GPIO2_timer;
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -86,21 +85,10 @@ static struct btn_timer onboard_timer;
 static void
 config(uint32_t port_base, uint32_t pin_mask)
 {
-  /* Software controlled */
   GPIO_SOFTWARE_CONTROL(port_base, pin_mask);
-
-  /* Set pin to input */
   GPIO_SET_INPUT(port_base, pin_mask);
-
-  /* Enable edge detection */
   GPIO_DETECT_EDGE(port_base, pin_mask);
-
-  /* Single edge */
   GPIO_TRIGGER_BOTH_EDGES(port_base, pin_mask);
-
-  /* Trigger interrupt on Falling edge */
-//  GPIO_DETECT_FALLING(port_base, pin_mask);
-
   GPIO_ENABLE_INTERRUPT(port_base, pin_mask);
 }
 
@@ -116,26 +104,77 @@ config(uint32_t port_base, uint32_t pin_mask)
 static void
 btn_callback(uint8_t port, uint8_t pin)
 {
-  if(!timer_expired(&debouncetimer)) {
-    return;
+ if(!timer_expired(&debouncetimer)) {
+  return;
+ }
+
+ timer_set(&debouncetimer, CLOCK_SECOND / 16);
+
+ if((port == BUTTON_ONBOARD_PORT) && (pin == BUTTON_ONBOARD_PIN)) {
+  if (GPIO_READ_PIN(GPIO_C_BASE, 0x10 ) == 0) {
+   onboard_timer.start = clock_time();
+   onboard_timer.duration = 0;
   }
+  else {
+   onboard_timer.duration = clock_time() - onboard_timer.start;
+   sensors_changed(&button_onboard_sensor);
+  }
+ }
+ else if((port == BUTTON_GPIO0_PORT) && (pin == BUTTON_GPIO0_PIN)) 
+  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/40, GPIO_timer_callback, BUTTON_GPIO0_PIN_MASK);
+ else if((port == BUTTON_GPIO1_PORT) && (pin == BUTTON_GPIO1_PIN))
+  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/40, GPIO_timer_callback, BUTTON_GPIO1_PIN_MASK);
+ else if((port == BUTTON_GPIO2_PORT) && (pin == BUTTON_GPIO2_PIN))
+  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/40, GPIO_timer_callback, BUTTON_GPIO2_PIN_MASK);
+}
 
-  timer_set(&debouncetimer, CLOCK_SECOND / 8);
 
-  if((port == BUTTON_LEFT_PORT) && (pin == BUTTON_LEFT_PIN)) {
-    sensors_changed(&button_left_sensor);
-  } else if((port == BUTTON_ONBOARD_PORT) && (pin == BUTTON_ONBOARD_PIN)) {
-    if (GPIO_READ_PIN(GPIO_C_BASE, 0x10 ) == 0) {
-	onboard_timer.start = clock_time();
-	onboard_timer.duration = 0;
-    }
-    else {
-      onboard_timer.duration = clock_time() - onboard_timer.start;
-      sensors_changed(&button_onboard_sensor);
-    }
+static void
+GPIO_timer_callback(void *n)
+{
+static uint8_t GPIO_handle;
 
+ GPIO_handle = n;
+ switch (GPIO_handle) {
+ case 0x1:
+  if (GPIO_READ_PIN(GPIO_D_BASE, GPIO_handle ) == 0) {
+   GPIO1_timer.start = clock_time();
+   GPIO1_timer.duration = 0;
+  }
+  else {
+   GPIO1_timer.duration = clock_time() - GPIO1_timer.start;
+   sensors_changed(&button_GPIO1_sensor);
+  }
+  break;
+ case 0x2:
+  if (GPIO_READ_PIN(GPIO_D_BASE, GPIO_handle ) == 0) {
+   GPIO0_timer.start = clock_time();
+   GPIO0_timer.duration = 0;
+  }
+  else {
+   GPIO0_timer.duration = clock_time() - GPIO0_timer.start;
+   sensors_changed(&button_GPIO0_sensor);
+  }
+  break;
+ case 0x4:
+  if (GPIO_READ_PIN(GPIO_D_BASE, GPIO_handle ) == 0) {
+//   leds_on(LEDS_RED);
+//   clock_delay_usec(1000);
+//   leds_off(LEDS_RED);
+   GPIO2_timer.start = clock_time();
+   GPIO2_timer.duration = 0;
+  }
+  else {
+//   leds_on(LEDS_GREEN);
+//   clock_delay_usec(1000);
+//   leds_off(LEDS_GREEN);
+   GPIO2_timer.duration = clock_time() - GPIO2_timer.start;
+   sensors_changed(&button_GPIO2_sensor);
+  }
+  break;
   }
 }
+
 
 void
 simistor_strob_callback(void)
@@ -163,8 +202,8 @@ simistor_strob_callback(void)
 void
  zero_detector_enable_callback(void)
 {
- GPIO_ENABLE_INTERRUPT(BUTTON_LEFT_PORT, BUTTON_LEFT_PIN);
- nvic_interrupt_enable(BUTTON_LEFT_VECTOR);
+ GPIO_ENABLE_INTERRUPT(AC_ZERO_DETECTOR_PORT, AC_ZERO_DETECTOR_PIN);
+ nvic_interrupt_enable(AC_ZERO_DETECTOR_VECTOR);
 
 }
 
@@ -211,7 +250,8 @@ zero_cross_callback(uint8_t port, uint8_t pin)
 //        rtimer_set(&my_rt, RTIMER_NOW()+(RTIMER_SECOND/10000)*abs(95-dimming_time), 1, my_rt_callback, NULL);
 
 
-        rtimer_set(&simistor_strob_rtimer, RTIMER_NOW()+(RTIMER_SECOND/10000)*abs(95-dimming_time), 1, simistor_strob_callback, NULL);
+    rtimer_set(&simistor_strob_rtimer, RTIMER_NOW()+(RTIMER_SECOND/10000)*abs(95-dimming_time), 1, simistor_strob_callback, NULL);
+
 //    else 
 //	 nvic_interrupt_enable(BUTTON_LEFT_VECTOR);	
 //  }
@@ -234,50 +274,76 @@ zero_cross_callback(uint8_t port, uint8_t pin)
  * \return ignored
  */
 static int
-config_left(int type, int value)
+config_ac_zero_detector(int type, int value)
 {
 //  config(BUTTON_LEFT_PORT_BASE, BUTTON_LEFT_PIN_MASK);
       /* Software controlled */
-  GPIO_SOFTWARE_CONTROL(BUTTON_LEFT_PORT_BASE, BUTTON_LEFT_PIN_MASK);
+  GPIO_SOFTWARE_CONTROL(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
 
   /* Se2t pin to input */
-  GPIO_SET_INPUT(BUTTON_LEFT_PORT_BASE, BUTTON_LEFT_PIN_MASK);
+  GPIO_SET_INPUT(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
 
   /* Enable edge detection */
-  GPIO_DETECT_EDGE(BUTTON_LEFT_PORT_BASE, BUTTON_LEFT_PIN_MASK);
+  GPIO_DETECT_EDGE(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
 
   /* Single edge */
-  GPIO_TRIGGER_SINGLE_EDGE(BUTTON_LEFT_PORT_BASE, BUTTON_LEFT_PIN_MASK);
+  GPIO_TRIGGER_SINGLE_EDGE(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
 
   /* Trigger interrupt on Falling edge */
-  GPIO_DETECT_FALLING(BUTTON_LEFT_PORT_BASE, BUTTON_LEFT_PIN_MASK);
-//  GPIO_DETECT_RISING(BUTTON_LEFT_PORT_BASE, BUTTON_LEFT_PIN_MASK);
+  GPIO_DETECT_FALLING(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
+//  GPIO_DETECT_RISING(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
 
-  GPIO_ENABLE_INTERRUPT(BUTTON_LEFT_PORT_BASE, BUTTON_LEFT_PIN_MASK);
+  GPIO_ENABLE_INTERRUPT(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
 
-  ioc_set_over(BUTTON_LEFT_PORT, BUTTON_LEFT_PIN, IOC_OVERRIDE_PUE);
+  ioc_set_over(AC_ZERO_DETECTOR_PORT, AC_ZERO_DETECTOR_PIN, IOC_OVERRIDE_PUE);
 
-  nvic_interrupt_enable(BUTTON_LEFT_VECTOR);
-
-  gpio_register_callback(zero_cross_callback, BUTTON_LEFT_PORT, BUTTON_LEFT_PIN);
+  nvic_interrupt_enable(AC_ZERO_DETECTOR_VECTOR);
+  gpio_register_callback(zero_cross_callback, AC_ZERO_DETECTOR_PORT, AC_ZERO_DETECTOR_PIN);
   return 1;
 }
 
-
+/*---------------------------------------------------------------------------*/
 static int
 config_onboard(int type, int value)
 {
   config(BUTTON_ONBOARD_PORT_BASE, BUTTON_ONBOARD_PIN_MASK);
-
   ioc_set_over(BUTTON_ONBOARD_PORT, BUTTON_ONBOARD_PIN, IOC_OVERRIDE_PUE);
-
   nvic_interrupt_enable(BUTTON_ONBOARD_VECTOR);
-
   gpio_register_callback(btn_callback, BUTTON_ONBOARD_PORT, BUTTON_ONBOARD_PIN);
   return 1;
 }
+/*---------------------------------------------------------------------------*/
+static int
+config_GPIO0(int type, int value)
+{
+  config(BUTTON_GPIO0_PORT_BASE, BUTTON_GPIO0_PIN_MASK);
+  ioc_set_over(BUTTON_GPIO0_PORT, BUTTON_GPIO0_PIN, IOC_OVERRIDE_PUE);
+  nvic_interrupt_enable(BUTTON_GPIO0_VECTOR);
+  gpio_register_callback(btn_callback, BUTTON_GPIO0_PORT, BUTTON_GPIO0_PIN);
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+static int
+config_GPIO1(int type, int value)
+{
+  config(BUTTON_GPIO1_PORT_BASE, BUTTON_GPIO1_PIN_MASK);
+  ioc_set_over(BUTTON_GPIO1_PORT, BUTTON_GPIO1_PIN, IOC_OVERRIDE_PUE);
+  nvic_interrupt_enable(BUTTON_GPIO1_VECTOR);
+  gpio_register_callback(btn_callback, BUTTON_GPIO1_PORT, BUTTON_GPIO1_PIN);
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+static int
+config_GPIO2(int type, int value)
+{
+  config(BUTTON_GPIO2_PORT_BASE, BUTTON_GPIO2_PIN_MASK);
+  ioc_set_over(BUTTON_GPIO2_PORT, BUTTON_GPIO2_PIN, IOC_OVERRIDE_PUE);
+  nvic_interrupt_enable(BUTTON_GPIO2_VECTOR);
+  gpio_register_callback(btn_callback, BUTTON_GPIO2_PORT, BUTTON_GPIO2_PIN);
+  return 1;
+}
 
-
+/*---------------------------------------------------------------------------*/
 static int
 value_onboard(int type)
 {
@@ -288,7 +354,39 @@ value_onboard(int type)
 
   return 0;
 }
+/*---------------------------------------------------------------------------*/
+static int
+value_GPIO0(int type)
+{
+  if (type == BUTTON_SENSOR_VALUE_STATE) {
+    return GPIO_READ_PIN(GPIO_D_BASE, 0x2 ) == 0 ?
+           BUTTON_SENSOR_VALUE_PRESSED : BUTTON_SENSOR_VALUE_RELEASED;
+  } else if(type == BUTTON_SENSOR_VALUE_DURATION) return (int)GPIO0_timer.duration;
 
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static int
+value_GPIO1(int type)
+{
+  if (type == BUTTON_SENSOR_VALUE_STATE) {
+    return GPIO_READ_PIN(GPIO_D_BASE, 0x1 ) == 0 ?
+           BUTTON_SENSOR_VALUE_PRESSED : BUTTON_SENSOR_VALUE_RELEASED;
+  } else if(type == BUTTON_SENSOR_VALUE_DURATION) return (int)GPIO1_timer.duration;
+
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static int
+value_GPIO2(int type)
+{
+  if (type == BUTTON_SENSOR_VALUE_STATE) {
+    return GPIO_READ_PIN(GPIO_D_BASE, 0x4 ) == 0 ?
+           BUTTON_SENSOR_VALUE_PRESSED : BUTTON_SENSOR_VALUE_RELEASED;
+  } else if(type == BUTTON_SENSOR_VALUE_DURATION) return (int)GPIO2_timer.duration;
+
+  return 0;
+}
 
 
 /*---------------------------------------------------------------------------*/
@@ -299,9 +397,11 @@ button_sensor_init()
 }
 /*---------------------------------------------------------------------------*/
 //SENSORS_SENSOR(button_select_sensor, BUTTON_SENSOR, NULL, config_select, NULL);
-SENSORS_SENSOR(button_left_sensor, BUTTON_SENSOR, NULL, config_left, NULL);
+SENSORS_SENSOR(AC_ZERO_DETECTOR_sensor, BUTTON_SENSOR, NULL, config_ac_zero_detector, NULL);
 SENSORS_SENSOR(button_onboard_sensor, BUTTON_SENSOR, value_onboard, config_onboard, NULL);
-//SENSORS_SENSOR(button_right_sensor, BUTTON_SENSOR, NULL, config_right, NULL);
+SENSORS_SENSOR(button_GPIO0_sensor, BUTTON_SENSOR, value_GPIO0, config_GPIO0, NULL);
+SENSORS_SENSOR(button_GPIO1_sensor, BUTTON_SENSOR, value_GPIO1, config_GPIO1, NULL);
+SENSORS_SENSOR(button_GPIO2_sensor, BUTTON_SENSOR, value_GPIO2, config_GPIO2, NULL);
 //SENSORS_SENSOR(button_up_sensor, BUTTON_SENSOR, NULL, config_up, NULL);
 //SENSORS_SENSOR(button_down_sensor, BUTTON_SENSOR, NULL, config_down, NULL);
 

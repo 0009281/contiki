@@ -56,8 +56,11 @@
 
 
 #define button_sensor button_select_sensor
-extern const struct sensors_sensor button_left_sensor;
+extern const struct sensors_sensor AC_ZERO_DETECTOR_sensor;
 extern const struct sensors_sensor button_onboard_sensor;
+extern const struct sensors_sensor button_GPIO0_sensor;
+extern const struct sensors_sensor button_GPIO1_sensor;
+extern const struct sensors_sensor button_GPIO2_sensor;
 /*---------------------------------------------------------------------------*/
 #endif /* BUTTON_SENSOR_H_ */
 
@@ -66,7 +69,7 @@ int dimming_time;
 
 /** \brief Common initialiser for all SmartRF Buttons */
 void button_sensor_init();
-
+static void GPIO_timer_callback(void *);
 /**
  * @}
  * @}

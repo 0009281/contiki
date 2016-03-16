@@ -81,6 +81,9 @@
 #define LEDS_YELLOW             0x2 | 0x80 /**< LED2 (Yellow) -> PC1 */
 #define LEDS_GREEN              0x40 /**< LED3 (Green)  -> PC2 */
 #define LEDS_ORANGE             0x80 /**< LED4 (Orange) -> PC3 */
+#define LEDS_RED             0x80 /**< LED4 (Orange) -> PC3 */
+#define LEDS_CONF_ALL           0xC0
+
 
 
 /* Notify various examples that we have LEDs */
@@ -111,27 +114,44 @@
 
 #define UART1_RTS_PORT          GPIO_D_NUM
 #define UART1_RTS_PIN           3
+
+
 /** @} */
 /*---------------------------------------------------------------------------*/
-/** \name SmartRF Button configuration
+/** \name SH Button configuration
  *
  * Buttons on the SmartRF06 are connected as follows:
- * - BUTTON_SELECT -> PA3
- * - BUTTON_LEFT -> PC4
- * - BUTTON_RIGHT -> PC5
- * - BUTTON_UP -> PC6
- * - BUTTON_DOWN -> PC7
+ * - BUTTON_ONBOARD -> PC4
+ * - BUTTON_GPIO0 -> PD1
+ * - BUTTON_GPIO1 -> PD0
+ * - BUTTON_GPIO2 -> PD2
  * @{
  */
 
-/** BUTTON_LEFT -> PC4 */
+/** BUTTON_ONBOARD -> PC4 */
 #define BUTTON_ONBOARD_PORT        GPIO_C_NUM
 #define BUTTON_ONBOARD_PIN         4
 #define BUTTON_ONBOARD_VECTOR      NVIC_INT_GPIO_PORT_C
 
-#define BUTTON_LEFT_PORT        GPIO_B_NUM
-#define BUTTON_LEFT_PIN         3
-#define BUTTON_LEFT_VECTOR      NVIC_INT_GPIO_PORT_B
+/** BUTTON_GPIO0 -> PD0 */
+#define BUTTON_GPIO0_PORT        GPIO_D_NUM
+#define BUTTON_GPIO0_PIN         1
+#define BUTTON_GPIO0_VECTOR      NVIC_INT_GPIO_PORT_D
+
+/** BUTTON_GPIO1 -> PD1 */
+#define BUTTON_GPIO1_PORT        GPIO_D_NUM
+#define BUTTON_GPIO1_PIN         0
+#define BUTTON_GPIO1_VECTOR      NVIC_INT_GPIO_PORT_D
+
+/** BUTTON_GPIO2 -> PD2 */
+#define BUTTON_GPIO2_PORT        GPIO_D_NUM
+#define BUTTON_GPIO2_PIN         2
+#define BUTTON_GPIO2_VECTOR      NVIC_INT_GPIO_PORT_D
+
+
+#define AC_ZERO_DETECTOR_PORT        GPIO_B_NUM
+#define AC_ZERO_DETECTOR_PIN         3
+#define AC_ZERO_DETECTOR_VECTOR      NVIC_INT_GPIO_PORT_B
 
 
 /* Notify various examples that we have Buttons */

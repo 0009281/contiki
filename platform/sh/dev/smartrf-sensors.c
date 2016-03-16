@@ -49,8 +49,7 @@
 
 /** \brief Exports a global symbol to be used by the sensor API */
 
-SENSORS(&button_left_sensor, &button_onboard_sensor, &als_sensor,
-        &cc2538_temp_sensor, &vdd3_sensor);
+SENSORS(&AC_ZERO_DETECTOR_sensor, &button_onboard_sensor, &button_GPIO0_sensor, &button_GPIO1_sensor, &button_GPIO2_sensor, &als_sensor, &cc2538_temp_sensor, &vdd3_sensor);
 
 
 /**
