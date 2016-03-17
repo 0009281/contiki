@@ -78,16 +78,16 @@
 #undef LEDS_RED
 #undef LEDS_CONF_ALL
 
-#define LEDS_YELLOW             2 /**< LED2 (Yellow) -> PC1 */
-#define LEDS_GREEN              4 /**< LED3 (Green)  -> PC2 */
-#define LEDS_ORANGE             8 /**< LED4 (Orange) -> PC3 */
+#define LEDS_YELLOW             0x2 /**< LED2 (Yellow) -> PC1 */
+#define LEDS_GREEN              0x40 /**< LED3 (Green)  -> PC2 */
+#define LEDS_ORANGE             0x80 /**< LED4 (Orange) -> PC3 */
 
 #if USB_SERIAL_CONF_ENABLE
-#define LEDS_CONF_ALL           14
+#define LEDS_CONF_ALL           0xC0
 #define LEDS_RED                LEDS_ORANGE
 #else
-#define LEDS_CONF_ALL           15
-#define LEDS_RED                1 /**< LED1 (Red)    -> PC0 */
+#define LEDS_CONF_ALL           0xC0
+#define LEDS_RED                0x80 /**< LED1 (Red)    -> PC0 */
 #endif
 
 /* Notify various examples that we have LEDs */
@@ -155,16 +155,16 @@
 
 /** BUTTON_UP -> PC6 */
 #define BUTTON_UP_PORT          GPIO_C_NUM
-#define BUTTON_UP_PIN           6
+#define BUTTON_UP_PIN           2
 #define BUTTON_UP_VECTOR        NVIC_INT_GPIO_PORT_C
 
 /** BUTTON_DOWN -> PC7 */
 #define BUTTON_DOWN_PORT        GPIO_C_NUM
-#define BUTTON_DOWN_PIN         7
+#define BUTTON_DOWN_PIN         3
 #define BUTTON_DOWN_VECTOR      NVIC_INT_GPIO_PORT_C
 
 /* Notify various examples that we have Buttons */
-#define PLATFORM_HAS_BUTTON     1
+#define PLATFORM_HAS_BUTTON     0
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**
