@@ -45,6 +45,9 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "sh_main.h"
+
+
 #define AC_ZERO_DETECTOR_PORT_BASE    GPIO_PORT_TO_BASE(AC_ZERO_DETECTOR_PORT)
 #define AC_ZERO_DETECTOR_PIN_MASK     GPIO_PIN_MASK(AC_ZERO_DETECTOR_PIN)
 
@@ -76,6 +79,9 @@ struct btn_timer {
 };
 
 static struct btn_timer onboard_timer, GPIO0_timer, GPIO1_timer, GPIO2_timer;
+
+extern sh_dimmer_t dim_chan0;
+
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -298,7 +304,8 @@ zero_cross_callback(uint8_t port, uint8_t pin)
 //        rtimer_set(&my_rt, RTIMER_NOW()+(RTIMER_SECOND/10000)*abs(95-dimming_time), 1, my_rt_callback, NULL);
 
 
-    rtimer_set(&simistor_strob_rtimer, RTIMER_NOW()+(RTIMER_SECOND/10000)*abs(95-dimming_time), 1, simistor_strob_callback, NULL);
+//    rtimer_set(&simistor_strob_rtimer, RTIMER_NOW()+(RTIMER_SECOND/10000)*abs(95-dimming_time), 1, simistor_strob_callback, NULL);
+    rtimer_set(&dim_chan0.thyristor_rtimer, RTIMER_NOW()+(RTIMER_SECOND/10000)*abs(95-dimming_time), 1, simistor_strob_callback, NULL);
 
 //    else 
 //	 nvic_interrupt_enable(BUTTON_LEFT_VECTOR);	
