@@ -78,11 +78,14 @@
 #undef LEDS_RED
 #undef LEDS_CONF_ALL
 
+#define LAMP_CHAN0              0x4
+
 #define LEDS_YELLOW             0x2 | 0x80 /**< LED2 (Yellow) -> PC1 */
 #define LEDS_GREEN              0x40 /**< LED3 (Green)  -> PC2 */
 #define LEDS_ORANGE             0x80 /**< LED4 (Orange) -> PC3 */
-#define LEDS_RED             0x80 /**< LED4 (Orange) -> PC3 */
-#define LEDS_CONF_ALL           0xC0
+#define LEDS_RED                0x80 /**< LED4 (Orange) -> PC3 */
+#define LEDS_CONF_ALL           LEDS_GREEN + LEDS_RED + LAMP_CHAN0
+
 
 
 

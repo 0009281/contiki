@@ -55,7 +55,7 @@
 #define BUTTON_SENSOR_VALUE_PRESSED  1
 
 
-#define button_sensor button_select_sensor
+#define button_sensor button_onboard_sensor
 extern const struct sensors_sensor AC_ZERO_DETECTOR_sensor;
 extern const struct sensors_sensor button_onboard_sensor;
 extern const struct sensors_sensor button_GPIO0_sensor;

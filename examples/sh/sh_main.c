@@ -7,6 +7,7 @@
  */
 
 #include "contiki.h"
+#include "contiki-net.h"
 #include "sys/clock.h"
 #include "sys/rtimer.h"
 #include "dev/leds.h"
@@ -22,19 +23,40 @@
 
 #include "dev/rom-util.h"
 
+#include "rest-engine.h"
+
+#include "sh_main.h"
+
+#define DEBUG 0
+#if DEBUG
+#include <stdio.h>
+#define PRINTF(...) printf(__VA_ARGS__)
+#define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
+#define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lladdr)->addr[2], (lladdr)->addr[3], (lladdr)->addr[4], (lladdr)->addr[5])
+#else
+#define PRINTF(...)
+#define PRINT6ADDR(addr)
+#define PRINTLLADDR(addr)
+#endif
+
+
 static struct etimer et, dimmer_timer, ett;
-static unsigned char dimmer_command, dimmer_current_light, dimmer_Lmin=0, dimmer_Lmax=30, dimmer_Tconst=1;
-static uint32_t dimmer_current_state=0, current_sensor_iteration,  current_sensor_value_max, pwr;
+static unsigned char dimmer_current_light, dimmer_Lmin=0, dimmer_Tconst=1;
+static uint32_t current_sensor_iteration,  current_sensor_value_max, pwr;
 static uint64_t pwr_sum;
 static double current_sensor_value, temp_current_sensor_value;
 //extern int dimming_time;
-#define DIMMER_TOGGLE 0xC2
-#define DIMMER_CYCLE_DIMMING 0xC3
-#define DIMMER_CYCLE_DIMMING_STOP 0xC4
-#define DIMMER_ENABLED 1
-#define DIMMER_DISABLED 0
-#define DIMMER_UP 1
-#define DIMMER_DOWN 0
+
+
+unsigned char dimmer_command, dimmer_Lmax=30;
+uint32_t dimmer_current_state=0;
+
+
+extern resource_t  res_toggle, res_dimmer_toggle, res_dimmer_cycle_dimming,  res_dimmer_on,  res_dimmer_off,
+                   res_dimmer_set_light, res_dimmer_get_status;
+
+sh_dimmer_t dim_chan0;
+
 
 //#define FILENAME "test"
 
@@ -60,7 +82,7 @@ void
 rt_callback(struct rtimer *t, void *ptr)
 {
   rt_now = RTIMER_NOW();
-  ct = clock_time();
+8  ct = clock_time();
   printf("Task called at %lu (clock = %lu)\n", rt_now, ct);
 GPIO_SET_PIN(GPIO_C_BASE, 0x80);
 }
@@ -70,8 +92,31 @@ GPIO_SET_PIN(GPIO_C_BASE, 0x80);
 PROCESS(dimmer_process, "Dimming process");
 PROCESS(btn_process, "Button/Gpio process");
 PROCESS(current_sensor_process, "Current sensor process");
-AUTOSTART_PROCESSES(&dimmer_process, &btn_process);
+PROCESS(er_example_server, "Erbium Example Server");
+AUTOSTART_PROCESSES(&dimmer_process, &btn_process, &er_example_server);
 
+
+
+/*
+PRCOESS_THREAD(dimmer_thyristor_control, ev, daya(sh_dimmer_t *dim)
+{
+
+ do {
+//  leds_on(LEDS_GREEN);
+
+//  etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
+  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+  etimer_reset(&dimmer_timer);
+//  leds_off(LEDS_GREEN);
+  dimming_time++;
+
+ } while (dimming_time<=dim->Lmax);
+
+
+ return 0;
+}
+
+*/
 
 
 /*---------------------------------------------------------------------------*/
@@ -81,6 +126,8 @@ int i;
 int btn_pressed=0;
 static int direction;
 uint32_t tt = 0x55AABBCC;
+
+sh_dimmer_t * dim = data;
 
   PROCESS_BEGIN();
 
@@ -96,7 +143,7 @@ uint32_t tt = 0x55AABBCC;
 /*
   GPIO_SOFTWARE_CONTROL(GPIO_B_NUM,0x08 );
 */
-  GPIO_CLR_PIN(GPIO_C_BASE, 0x4);  
+  GPIO_CLR_PIN(GPIO_C_BASE, 0x4);
   GPIO_SET_OUTPUT(GPIO_C_BASE, 0x4);
 
   GPIO_SET_INPUT(GPIO_A_BASE, 0x40);
@@ -245,31 +292,21 @@ if (dimmer_current_state) { dimming_time=30; dimmer_current_state=1;}
 //direction=1;
   while(1) {
 
-	PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE);
-    
-	if (dimmer_command==DIMMER_TOGGLE)
-	{
-	  printf("Toggle command received!\n\r");
-	    if (dimmer_current_state==DIMMER_DISABLED)
-	    {
-		  GPIO_SET_OUTPUT(GPIO_C_BASE, 0x4);
-		  printf("Enable dimmer!\n\r");
-		do
-		{
-    		leds_on(LEDS_GREEN);
-                etimer_set(&dimmer_timer, CLOCK_SECOND*dimmer_Tconst/(dimmer_Lmax-dimmer_Lmin));
-                PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
-                etimer_reset(&dimmer_timer);
-    		leds_off(LEDS_GREEN);
-		dimming_time++;
-		} while (dimming_time<=dimmer_Lmax);
-		
-//		dimming_time=80;
+   PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE);
+   PRINTF("Dimmer process has awoken, DIMMER_COMMAND=%x\r\n", dimmer_command);
+   if (dimmer_command==DIMMER_TOGGLE) {
+    if (dimmer_current_state==DIMMER_DISABLED) {
+     do {
+       etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dimmer_Lmax-dimmer_Lmin));
+       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+       etimer_reset(&dimmer_timer);
+       dimming_time++;
+       } while (dimming_time<=dimmer_Lmax);
 
-		dimmer_current_light=dimmer_Lmax;
-		dimmer_current_state = DIMMER_ENABLED;
-		rom_util_page_erase( 0x27F000, 2048);
-		rom_util_program_flash(&dimmer_current_state, 0x27F000, 4);
+     dimmer_current_light=dimmer_Lmax;
+     dimmer_current_state = DIMMER_ENABLED;
+     rom_util_page_erase( 0x27F000, 2048);
+     rom_util_program_flash(&dimmer_current_state, 0x27F000, 4);
 
 
 	    }
@@ -310,6 +347,43 @@ if (dimmer_current_state) { dimming_time=30; dimmer_current_state=1;}
 	    dimmer_current_state = DIMMER_ENABLED;
 	    printf("Dimmer value after cycle dimming: %u\n\r",dimmer_Lmax);
 	}
+
+	else if (dimmer_command==DIMMER_ON) {
+         printf("Toggle Command On!\n\r");
+	do
+		{
+//    		leds_on(LEDS_GREEN);
+                etimer_set(&dimmer_timer, CLOCK_SECOND*dimmer_Tconst/(dimmer_Lmax-dimmer_Lmin));
+                PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+                etimer_reset(&dimmer_timer);
+//    		leds_off(LEDS_GREEN);
+		dimming_time++;
+		} while (dimming_time<=dimmer_Lmax);
+		
+//		dimming_time=80;
+
+		dimmer_current_light=dimmer_Lmax;
+		dimmer_current_state = DIMMER_ENABLED;
+		rom_util_page_erase( 0x27F000, 2048);
+		rom_util_program_flash(&dimmer_current_state, 0x27F000, 4);
+	}
+        else if (dimmer_command==DIMMER_OFF)
+	    {
+         printf("Toggle Command Off!\n\r");
+		do
+		{
+                etimer_set(&dimmer_timer, CLOCK_SECOND*dimmer_Tconst/(dimmer_Lmax-dimmer_Lmin));
+                PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+                etimer_reset(&dimmer_timer);
+		dimming_time--;
+		} while (dimming_time>dimmer_Lmin);
+//		  GPIO_SET_INPUT(GPIO_C_BASE, 0x4);    
+		dimmer_current_light=dimmer_Lmin;
+		dimmer_current_state = DIMMER_DISABLED;
+		rom_util_page_erase( 0x27F000, 2048);
+		rom_util_program_flash(&dimmer_current_state, 0x27F000, 4);
+
+	    }
 
 	    dimmer_command=0;
 
@@ -501,5 +575,49 @@ PROCESS_THREAD(btn_process, ev, data)
 
 }
 
-
 /*---------------------------------------------------------------------------*/
+
+
+PROCESS_THREAD(er_example_server, ev, data)
+{
+  PROCESS_BEGIN();
+
+  PROCESS_PAUSE();
+
+  PRINTF("Starting Erbium Example Server\n");
+
+#ifdef RF_CHANNEL
+  PRINTF("RF channel: %u\n", RF_CHANNEL);
+#endif
+#ifdef IEEE802154_PANID
+  PRINTF("PAN ID: 0x%04X\n", IEEE802154_PANID);
+#endif
+
+  PRINTF("uIP buffer: %u\n", UIP_BUFSIZE);
+  PRINTF("LL header: %u\n", UIP_LLH_LEN);
+  PRINTF("IP+UDP header: %u\n", UIP_IPUDPH_LEN);
+  PRINTF("REST max chunk: %u\n", REST_MAX_CHUNK_SIZE);
+
+  /* Initialize the REST engine. */
+  rest_init_engine();
+
+  /*
+   * Bind the resources to their Uri-Path.
+   * WARNING: Activating twice only means alternate path, not two instances!
+   * All static variables are the same for each URI path.
+   */
+  rest_activate_resource(&res_toggle, "actuators/toggle");
+  rest_activate_resource(&res_dimmer_toggle, "dimmer/toggle");
+  rest_activate_resource(&res_dimmer_cycle_dimming, "dimmer/cycle_dimming");
+  rest_activate_resource(&res_dimmer_on, "dimmer/on");
+  rest_activate_resource(&res_dimmer_off, "dimmer/off");
+  rest_activate_resource(&res_dimmer_set_light, "dimmer/set_light");
+  rest_activate_resource(&res_dimmer_get_status, "dimmer/status");
+
+  /* Define application-specific events here. */
+  while(1) {
+    PROCESS_WAIT_EVENT();
+  }                             /* while (1) */
+
+  PROCESS_END();
+}

@@ -69,6 +69,7 @@ static int count50=0;
 
 
 struct btn_timer {
+  uint8_t status;
   struct timer debounce;
   clock_time_t start;
   clock_time_t duration;
@@ -104,28 +105,54 @@ config(uint32_t port_base, uint32_t pin_mask)
 static void
 btn_callback(uint8_t port, uint8_t pin)
 {
- if(!timer_expired(&debouncetimer)) {
+
+// if(!timer_expired(&debouncetimer)) {
+//  return;
+// }
+ if(!timer_expired(&GPIO_callback_timer)) {
   return;
  }
 
- timer_set(&debouncetimer, CLOCK_SECOND / 16);
 
- if((port == BUTTON_ONBOARD_PORT) && (pin == BUTTON_ONBOARD_PIN)) {
-  if (GPIO_READ_PIN(GPIO_C_BASE, 0x10 ) == 0) {
-   onboard_timer.start = clock_time();
-   onboard_timer.duration = 0;
-  }
-  else {
-   onboard_timer.duration = clock_time() - onboard_timer.start;
-   sensors_changed(&button_onboard_sensor);
-  }
- }
+// timer_set(&debouncetimer, CLOCK_SECOND / 16);
+
+
+ if((port == BUTTON_ONBOARD_PORT) && (pin == BUTTON_ONBOARD_PIN)) 
+  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/8, GPIO_timer_callback, BUTTON_ONBOARD_PIN_MASK);
  else if((port == BUTTON_GPIO0_PORT) && (pin == BUTTON_GPIO0_PIN)) 
-  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/40, GPIO_timer_callback, BUTTON_GPIO0_PIN_MASK);
+  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/8, GPIO_timer_callback, BUTTON_GPIO0_PIN_MASK);
  else if((port == BUTTON_GPIO1_PORT) && (pin == BUTTON_GPIO1_PIN))
-  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/40, GPIO_timer_callback, BUTTON_GPIO1_PIN_MASK);
- else if((port == BUTTON_GPIO2_PORT) && (pin == BUTTON_GPIO2_PIN))
-  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/40, GPIO_timer_callback, BUTTON_GPIO2_PIN_MASK);
+  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/8, GPIO_timer_callback, BUTTON_GPIO1_PIN_MASK);
+ else if((port == BUTTON_GPIO2_PORT) && (pin == BUTTON_GPIO2_PIN)) {
+  ctimer_set(&GPIO_callback_timer, CLOCK_SECOND/8, GPIO_timer_callback, BUTTON_GPIO2_PIN_MASK);
+
+/*
+  if (GPIO_READ_PIN(GPIO_D_BASE, 0x4 ) == 0) {
+   leds_on(LEDS_RED);
+   clock_delay_usec(1000);
+   leds_off(LEDS_RED);
+   GPIO2_timer.start = clock_time();
+   GPIO2_timer.duration = 0;
+   GPIO2_timer.status = 0xAA;
+  }
+  else if (GPIO2_timer.status == 0xAA)  {
+   leds_on(LEDS_GREEN);
+   clock_delay_usec(1000);
+   leds_off(LEDS_GREEN);
+   GPIO2_timer.duration = clock_time() - GPIO2_timer.start;
+   sensors_changed(&button_GPIO2_sensor);
+   GPIO2_timer.status = 0x0;
+  }
+*/
+
+
+
+
+
+
+
+ }
+
 }
 
 
@@ -136,42 +163,64 @@ static uint8_t GPIO_handle;
 
  GPIO_handle = n;
  switch (GPIO_handle) {
+
+ case 0x10:
+  if (GPIO_READ_PIN(GPIO_C_BASE, GPIO_handle ) == 0) {
+   onboard_timer.start = clock_time();
+   onboard_timer.duration = 0;
+   onboard_timer.status = 0xAA;
+  }
+  else if (onboard_timer.status==0xAA) {
+   onboard_timer.duration = clock_time() - onboard_timer.start;
+   sensors_changed(&button_onboard_sensor);
+   onboard_timer.status = 0;
+  }
+  break;
  case 0x1:
   if (GPIO_READ_PIN(GPIO_D_BASE, GPIO_handle ) == 0) {
    GPIO1_timer.start = clock_time();
    GPIO1_timer.duration = 0;
+   GPIO1_timer.status = 0xAA;
   }
   else {
    GPIO1_timer.duration = clock_time() - GPIO1_timer.start;
    sensors_changed(&button_GPIO1_sensor);
+   GPIO1_timer.status = 0x0;
   }
   break;
  case 0x2:
   if (GPIO_READ_PIN(GPIO_D_BASE, GPIO_handle ) == 0) {
    GPIO0_timer.start = clock_time();
    GPIO0_timer.duration = 0;
+   GPIO0_timer.status = 0xAA;
   }
   else {
    GPIO0_timer.duration = clock_time() - GPIO0_timer.start;
    sensors_changed(&button_GPIO0_sensor);
+   GPIO0_timer.status = 0x0;
   }
   break;
+
  case 0x4:
   if (GPIO_READ_PIN(GPIO_D_BASE, GPIO_handle ) == 0) {
-//   leds_on(LEDS_RED);
-//   clock_delay_usec(1000);
-//   leds_off(LEDS_RED);
+   leds_on(LEDS_RED);
+   clock_delay_usec(1000);
+   leds_off(LEDS_RED);
    GPIO2_timer.start = clock_time();
    GPIO2_timer.duration = 0;
+   GPIO2_timer.status = 0xAA;
   }
-  else {
-//   leds_on(LEDS_GREEN);
-//   clock_delay_usec(1000);
-//   leds_off(LEDS_GREEN);
+  else if (GPIO2_timer.status==0xAA){
+   leds_on(LEDS_GREEN);
+   clock_delay_usec(1000);
+   leds_off(LEDS_GREEN);
    GPIO2_timer.duration = clock_time() - GPIO2_timer.start;
    sensors_changed(&button_GPIO2_sensor);
+   GPIO2_timer.status = 0x0;
   }
   break;
+
+
   }
 }
 
@@ -197,15 +246,14 @@ simistor_strob_callback(void)
 // nvic_interrupt_enable(BUTTON_LEFT_VECTOR);
 }
 
-
-
+/*
 void
  zero_detector_enable_callback(void)
 {
  GPIO_ENABLE_INTERRUPT(AC_ZERO_DETECTOR_PORT, AC_ZERO_DETECTOR_PIN);
  nvic_interrupt_enable(AC_ZERO_DETECTOR_VECTOR);
-
 }
+*/
 
 static void
 zero_cross_callback(uint8_t port, uint8_t pin)
@@ -291,6 +339,9 @@ config_ac_zero_detector(int type, int value)
 
   /* Trigger interrupt on Falling edge */
   GPIO_DETECT_FALLING(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
+//We can't use RISING detect, becuse while symithtor is open detector will always return 1=like we have
+//zero crossing, so we can use FALLING edge only.
+
 //  GPIO_DETECT_RISING(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
 
   GPIO_ENABLE_INTERRUPT(AC_ZERO_DETECTOR_PORT_BASE, AC_ZERO_DETECTOR_PIN_MASK);
