@@ -239,10 +239,10 @@ simistor_strob_callback(void)
 //  printf("Task called at %lu (clock = %lu)\n", rt_now, ct);
 
 
-  GPIO_SET_PIN(GPIO_C_BASE, 0x04);
+  GPIO_SET_PIN(GPIO_C_BASE, LAMP_CHAN0);
   clock_delay_usec(50);
 //disable simistor
-  GPIO_CLR_PIN(GPIO_C_BASE, 0x04);
+  GPIO_CLR_PIN(GPIO_C_BASE, LAMP_CHAN0);
 
 
 //GPIO_SET_PIN(GPIO_C_BASE, 0x80);
@@ -305,7 +305,8 @@ zero_cross_callback(uint8_t port, uint8_t pin)
 
 
 //    rtimer_set(&simistor_strob_rtimer, RTIMER_NOW()+(RTIMER_SECOND/10000)*abs(95-dimming_time), 1, simistor_strob_callback, NULL);
-    rtimer_set(&dim_chan0.thyristor_rtimer, RTIMER_NOW()+(RTIMER_SECOND/10000)*abs(95-dimming_time), 1, simistor_strob_callback, NULL);
+ if (dim_chan0.thyristor_open_time)
+  rtimer_set(&dim_chan0.thyristor_rtimer, RTIMER_NOW()+(RTIMER_SECOND/10000)*(255 - dim_chan0.thyristor_open_time)/2.68, 1, simistor_strob_callback, NULL);
 
 //    else 
 //	 nvic_interrupt_enable(BUTTON_LEFT_VECTOR);	

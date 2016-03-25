@@ -27,7 +27,7 @@
 
 #include "sh_main.h"
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -57,6 +57,9 @@ extern resource_t  res_toggle, res_dimmer_toggle, res_dimmer_cycle_dimming,  res
 
 sh_dimmer_t dim_chan0;
 
+
+rtimer_clock_t rt_now, rt_for;
+static clock_time_t ct;
 
 //#define FILENAME "test"
 
@@ -127,7 +130,7 @@ int btn_pressed=0;
 static int direction;
 uint32_t tt = 0x55AABBCC;
 
-sh_dimmer_t * dim = data;
+static sh_dimmer_t *dim;
 
   PROCESS_BEGIN();
 
@@ -282,9 +285,15 @@ else
 
 */
 
-rom_util_memcpy(&dimmer_current_state, 0x27F000,4);
-if (dimmer_current_state) { dimming_time=30; dimmer_current_state=1;}
+rom_util_memcpy(&dim_chan0, 0x27F000, sizeof(dim_chan0));
+//if (dim_chan0.current_state) {dim_chan0.thyristor_open_time = 30;}
 
+   PRINTF("Dimmer current state=%x\r\n", dim_chan0.current_state);
+dim_chan0.command = 0;
+dim_chan0.thyristor_open_time = 20;
+dim_chan0.Lmin = 0;
+dim_chan0.Lmax = 0xFF;
+dim_chan0.Tconst = 0;
 
 //    dimming_time=0;
 //    dimmer_current_state=0;
@@ -293,42 +302,62 @@ if (dimmer_current_state) { dimming_time=30; dimmer_current_state=1;}
   while(1) {
 
    PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE);
-   PRINTF("Dimmer process has awoken, DIMMER_COMMAND=%x\r\n", dimmer_command);
-   if (dimmer_command==DIMMER_TOGGLE) {
-    if (dimmer_current_state==DIMMER_DISABLED) {
+   dim = data;
+   PRINTF("Dimmer process has awoken, DIMMER_COMMAND=%x\r\n", dim->command);
+   PRINTF("Dimmer current state=%x\r\n", dim->current_state);
+   if (dim->command==DIMMER_TOGGLE) {
+    if (!dim->current_state) {
+     PRINTF("Switch on dimmer\n\r");
+     PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
+     PRINTF("Dimmer Lmax: %u\n\r", dim->Lmax);
+       etimer_set(&dimmer_timer, 0.5*CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
      do {
-       etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dimmer_Lmax-dimmer_Lmin));
        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+       dim->thyristor_open_time++;
        etimer_reset(&dimmer_timer);
-       dimming_time++;
-       } while (dimming_time<=dimmer_Lmax);
+       } while (dim->thyristor_open_time < dim->Lmax);
 
-     dimmer_current_light=dimmer_Lmax;
-     dimmer_current_state = DIMMER_ENABLED;
+     dim->current_light=dim->Lmax;
+     dim->current_state = DIMMER_ENABLED;
      rom_util_page_erase( 0x27F000, 2048);
-     rom_util_program_flash(&dimmer_current_state, 0x27F000, 4);
+     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
+    }
+    else if (dim->current_state) {
+     PRINTF("Switch off dimmer\n\r");
+     PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
+     PRINTF("Dimmer Lmin: %u\n\r", dim->Lmin);
+
+  rt_now = RTIMER_NOW();
+  ct = clock_time();
+  printf("Task called at %u (clock = %u)\n\r", rt_now, ct);
 
 
-	    }
-	    else if (dimmer_current_state==DIMMER_ENABLED)
-	    {
-		  printf("Disable dimmer!\n\r");
-		do
-		{
-                etimer_set(&dimmer_timer, CLOCK_SECOND*dimmer_Tconst/(dimmer_Lmax-dimmer_Lmin));
-                PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
-                etimer_reset(&dimmer_timer);
-		dimming_time--;
-		} while (dimming_time>dimmer_Lmin);
-//		  GPIO_SET_INPUT(GPIO_C_BASE, 0x4);    
-		dimmer_current_light=dimmer_Lmin;
-		dimmer_current_state = DIMMER_DISABLED;
-		rom_util_page_erase( 0x27F000, 2048);
-		rom_util_program_flash(&dimmer_current_state, 0x27F000, 4);
+      etimer_set(&dimmer_timer, (0.5*CLOCK_SECOND)*(dim->Tconst/(dim->Lmax-dim->Lmin)));
+//      etimer_set(&dimmer_timer, (CLOCK_SECOND/128)*(dim->Tconst));
+//      etimer_set(&dimmer_timer, (CLOCK_SECOND/2));
+     do {
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+      dim->thyristor_open_time--;
+      dim->thyristor_open_time--;
+//      etimer_reset(&dimmer_timer);
+//     PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
+//     PRINTF("Dimmer Lmin: %u\n\r", dim->Lmin);
 
-	    }
-	}
-	else if (dimmer_command==DIMMER_CYCLE_DIMMING)
+     } while (dim->thyristor_open_time > dim->Lmin);
+     PRINTF("FUCKKKKKKKKKKKKKKKKKKK\n\r");
+
+  rt_now = RTIMER_NOW();
+  ct = clock_time();
+  printf("Task called at %u (clock = %u)\n\r", rt_now, ct);
+
+
+     dim->current_light=dim->Lmin;
+     dim->current_state = DIMMER_DISABLED;
+     rom_util_page_erase( 0x27F000, 2048);
+     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
+    }
+   } //DIMMER_TOGGLE
+   else if (dimmer_command==DIMMER_CYCLE_DIMMING)
 	{
 
 	    leds_on(LEDS_ALL);	    
@@ -385,8 +414,8 @@ if (dimmer_current_state) { dimming_time=30; dimmer_current_state=1;}
 
 	    }
 
-	    dimmer_command=0;
-
+	    dim->command = 0;
+         printf("!!!!!!!!!!!!!!!!!\n\r");
 
 
 
@@ -493,19 +522,25 @@ PROCESS_THREAD(btn_process, ev, data)
   if(ev == sensors_event) {
 
    if(data == &button_onboard_sensor) {
-    printf("Onboard button: Pin %d, press duration %d clock ticks\n\r", (&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_STATE), (&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION));
+    PRINTF("Onboard button: Pin %d, press duration %d clock ticks\n\r", (&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_STATE), (&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION));
     if((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) < CLOCK_SECOND*0.7) {
-     printf("Onboard button short press\n\r");
-     if (!dimmer_command) {
-      dimmer_command = DIMMER_TOGGLE;
-      process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, NULL);
+     PRINTF("Onboard button short press\n\r");
+     PRINTF("Dimmer command=%x\r\n", dim_chan0.command);
+     if (!dim_chan0.command) {
+      dim_chan0.command = DIMMER_TOGGLE;
+      process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, &dim_chan0);
      }
-     else if (dimmer_command==DIMMER_CYCLE_DIMMING) {
-      dimmer_command=DIMMER_CYCLE_DIMMING_STOP;
+     else if (dim_chan0.command==DIMMER_CYCLE_DIMMING) {
+      dim_chan0.command=DIMMER_CYCLE_DIMMING_STOP;
      }
     }
     else if(((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
      printf("Onboard button middle button press!\n\r");
+//     dim_chan0.thyristor_open_time--;
+     dim_chan0.Tconst++;
+     PRINTF("Dimmer open time: %u\n\r", dim_chan0.thyristor_open_time);
+     PRINTF("Dimmer Tconst: %u\n\r", dim_chan0.Tconst);
+
     }
     else if((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3)  {
      printf("Onboard button long button press!\n\r");
