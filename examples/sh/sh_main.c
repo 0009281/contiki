@@ -292,7 +292,7 @@ rom_util_memcpy(&dim_chan0, 0x27F000, sizeof(dim_chan0));
 dim_chan0.command = 0;
 dim_chan0.thyristor_open_time = 20;
 dim_chan0.Lmin = 0;
-dim_chan0.Lmax = 0xFF;
+dim_chan0.Lmax = 100;
 dim_chan0.Tconst = 0;
 
 //    dimming_time=0;
@@ -301,60 +301,16 @@ dim_chan0.Tconst = 0;
 //direction=1;
   while(1) {
 
-   PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE);
+   PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE || dim->command);
    dim = data;
    PRINTF("Dimmer process has awoken, DIMMER_COMMAND=%x\r\n", dim->command);
    PRINTF("Dimmer current state=%x\r\n", dim->current_state);
    if (dim->command==DIMMER_TOGGLE) {
     if (!dim->current_state) {
-     PRINTF("Switch on dimmer\n\r");
-     PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
-     PRINTF("Dimmer Lmax: %u\n\r", dim->Lmax);
-       etimer_set(&dimmer_timer, 0.5*CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
-     do {
-       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
-       dim->thyristor_open_time++;
-       etimer_reset(&dimmer_timer);
-       } while (dim->thyristor_open_time < dim->Lmax);
-
-     dim->current_light=dim->Lmax;
-     dim->current_state = DIMMER_ENABLED;
-     rom_util_page_erase( 0x27F000, 2048);
-     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
+     dim->command==DIMMER_ON;
     }
     else if (dim->current_state) {
-     PRINTF("Switch off dimmer\n\r");
-     PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
-     PRINTF("Dimmer Lmin: %u\n\r", dim->Lmin);
-
-  rt_now = RTIMER_NOW();
-  ct = clock_time();
-  printf("Task called at %u (clock = %u)\n\r", rt_now, ct);
-
-
-      etimer_set(&dimmer_timer, (0.5*CLOCK_SECOND)*(dim->Tconst/(dim->Lmax-dim->Lmin)));
-//      etimer_set(&dimmer_timer, (CLOCK_SECOND/128)*(dim->Tconst));
-//      etimer_set(&dimmer_timer, (CLOCK_SECOND/2));
-     do {
-      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
-      dim->thyristor_open_time--;
-      dim->thyristor_open_time--;
-//      etimer_reset(&dimmer_timer);
-//     PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
-//     PRINTF("Dimmer Lmin: %u\n\r", dim->Lmin);
-
-     } while (dim->thyristor_open_time > dim->Lmin);
-     PRINTF("FUCKKKKKKKKKKKKKKKKKKK\n\r");
-
-  rt_now = RTIMER_NOW();
-  ct = clock_time();
-  printf("Task called at %u (clock = %u)\n\r", rt_now, ct);
-
-
-     dim->current_light=dim->Lmin;
-     dim->current_state = DIMMER_DISABLED;
-     rom_util_page_erase( 0x27F000, 2048);
-     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
+     dim->command==DIMMER_OFF;
     }
    } //DIMMER_TOGGLE
    else if (dimmer_command==DIMMER_CYCLE_DIMMING)
@@ -362,7 +318,7 @@ dim_chan0.Tconst = 0;
 
 	    leds_on(LEDS_ALL);	    
 	    do {
-    	    if (dimmer_current_state==DIMMER_ENABLED)	direction=DIMMER_DOWN; else direction=DIMMER_UP;
+    	    if (dimmer_current_state==DIMMER_ENABLED)	direction=DIMODMER_DOWN; else direction=DIMMER_UP;
 	    if (direction==DIMMER_UP) dimming_time++; else dimming_time--;
 
 	    if (dimming_time==0) dimmer_current_state=DIMMER_DISABLED;
@@ -379,38 +335,39 @@ dim_chan0.Tconst = 0;
 
 	else if (dimmer_command==DIMMER_ON) {
          printf("Toggle Command On!\n\r");
-	do
-		{
-//    		leds_on(LEDS_GREEN);
-                etimer_set(&dimmer_timer, CLOCK_SECOND*dimmer_Tconst/(dimmer_Lmax-dimmer_Lmin));
-                PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
-                etimer_reset(&dimmer_timer);
-//    		leds_off(LEDS_GREEN);
-		dimming_time++;
-		} while (dimming_time<=dimmer_Lmax);
-		
-//		dimming_time=80;
+     PRINTF("Switch on dimmer\n\r");
+     PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
+     PRINTF("Dimmer Lmax: %u\n\r", dim->Lmax);
+       etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
+     do {
+       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+       dim->thyristor_open_time++;
+       etimer_reset(&dimmer_timer);
+       } while (dim->thyristor_open_time < dim->Lmax);
 
-		dimmer_current_light=dimmer_Lmax;
-		dimmer_current_state = DIMMER_ENABLED;
-		rom_util_page_erase( 0x27F000, 2048);
-		rom_util_program_flash(&dimmer_current_state, 0x27F000, 4);
+     dim->current_light=dim->Lmax;
+     dim->current_state = DIMMER_ENABLED;
+     rom_util_page_erase( 0x27F000, 2048);
+     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
+
 	}
         else if (dimmer_command==DIMMER_OFF)
 	    {
-         printf("Toggle Command Off!\n\r");
-		do
-		{
-                etimer_set(&dimmer_timer, CLOCK_SECOND*dimmer_Tconst/(dimmer_Lmax-dimmer_Lmin));
-                PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
-                etimer_reset(&dimmer_timer);
-		dimming_time--;
-		} while (dimming_time>dimmer_Lmin);
-//		  GPIO_SET_INPUT(GPIO_C_BASE, 0x4);    
-		dimmer_current_light=dimmer_Lmin;
-		dimmer_current_state = DIMMER_DISABLED;
-		rom_util_page_erase( 0x27F000, 2048);
-		rom_util_program_flash(&dimmer_current_state, 0x27F000, 4);
+     PRINTF("Switch off dimmer\n\r");
+     PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
+     PRINTF("Dimmer Lmin: %u\n\r", dim->Lmin);
+
+      etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
+     do {
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+      dim->thyristor_open_time--;
+      etimer_reset(&dimmer_timer);
+     } while (dim->thyristor_open_time > dim->Lmin);
+
+     dim->current_light=dim->Lmin;
+     dim->current_state = DIMMER_DISABLED;
+     rom_util_page_erase( 0x27F000, 2048);
+     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
 
 	    }
 
@@ -538,7 +495,7 @@ PROCESS_THREAD(btn_process, ev, data)
      printf("Onboard button middle button press!\n\r");
 //     dim_chan0.thyristor_open_time--;
      dim_chan0.Tconst++;
-     PRINTF("Dimmer open time: %u\n\r", dim_chan0.thyristor_open_time);
+//     PRINTF("Dimmer open time: %u\n\r", dim_chan0.thyristor_open_time);
      PRINTF("Dimmer Tconst: %u\n\r", dim_chan0.Tconst);
 
     }
