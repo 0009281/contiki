@@ -47,6 +47,7 @@ typedef struct {
   uint8_t remote_controller_address[12]; //ipv6 address
 
   uint8_t current_state;
+  uint8_t direction;
   uint8_t command;
   uint8_t current_light;
   uint8_t thyristor_open_time;

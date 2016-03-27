@@ -40,7 +40,7 @@
 #endif
 
 
-static struct etimer et, dimmer_timer, ett;
+static struct etimer et, dimmer_timer, dimmer_timer2, ett;
 static unsigned char dimmer_current_light, dimmer_Lmin=0, dimmer_Tconst=1;
 static uint32_t current_sensor_iteration,  current_sensor_value_max, pwr;
 static uint64_t pwr_sum;
@@ -301,39 +301,46 @@ dim_chan0.Tconst = 0;
 //direction=1;
   while(1) {
 
-   PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE || dim->command);
+   PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE);
    dim = data;
    PRINTF("Dimmer process has awoken, DIMMER_COMMAND=%x\r\n", dim->command);
    PRINTF("Dimmer current state=%x\r\n", dim->current_state);
    if (dim->command==DIMMER_TOGGLE) {
     if (!dim->current_state) {
-     dim->command==DIMMER_ON;
+     dim->command=DIMMER_ON;
     }
     else if (dim->current_state) {
-     dim->command==DIMMER_OFF;
+     dim->command=DIMMER_OFF;
     }
    } //DIMMER_TOGGLE
-   else if (dimmer_command==DIMMER_CYCLE_DIMMING)
+
+
+   if (dim->command==DIMMER_CYCLE_DIMMING)
 	{
 
 	    leds_on(LEDS_ALL);	    
+            etimer_set(&dimmer_timer2, CLOCK_SECOND/16);
 	    do {
-    	    if (dimmer_current_state==DIMMER_ENABLED)	direction=DIMODMER_DOWN; else direction=DIMMER_UP;
-	    if (direction==DIMMER_UP) dimming_time++; else dimming_time--;
+            PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer2));
+//	     PRINTF("Dimmer direction: %u\n\r", dim->direction);
+//	     PRINTF("Dimmer current state: %u\n\r", dim->current_state);
+//	     PRINTF("Dimmer thyristor open timr: %u\n\r", dim->thyristor_open_time);
+//    	    if (dim->current_state)	dim->direction=DIMMER_DOWN; else dim->direction=DIMMER_UP;
+//	    if (dim->direction==DIMMER_UP) dim->thyristor_open_time++; else dim->thyristor_open_time--;
 
-	    if (dimming_time==0) dimmer_current_state=DIMMER_DISABLED;
-	    else if (dimming_time==100) dimmer_current_state=DIMMER_ENABLED;
+//	    if (dim->thyristor_open_time==0) dim->current_state=DIMMER_DISABLED;
+//	    else if (dim->thyristor_open_time==100) dim->current_state=DIMMER_ENABLED;
+	dim_chan0.thyristor_open_time = 20;
 
-            etimer_set(&dimmer_timer, CLOCK_SECOND/10);
-            PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
-            etimer_reset(&dimmer_timer);
-	    } while (dimmer_command!=DIMMER_CYCLE_DIMMING_STOP);
-	    dimmer_Lmax = dimming_time;
-	    dimmer_current_state = DIMMER_ENABLED;
-	    printf("Dimmer value after cycle dimming: %u\n\r",dimmer_Lmax);
+            etimer_reset(&dimmer_timer2);
+	    } while (dim->command!=DIMMER_CYCLE_DIMMING_STOP);
+//	    dim->Lmax = dim->thyristor_open_time;
+//	    dim->current_state = DIMMER_ENABLED;
+	    printf("Dimmer value after cycle dimming: %u\n\r",dim->Lmax);
+	    dim->command = 0;
 	}
 
-	else if (dimmer_command==DIMMER_ON) {
+	else if (dim->command==DIMMER_ON) {
          printf("Toggle Command On!\n\r");
      PRINTF("Switch on dimmer\n\r");
      PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
@@ -347,11 +354,12 @@ dim_chan0.Tconst = 0;
 
      dim->current_light=dim->Lmax;
      dim->current_state = DIMMER_ENABLED;
+
      rom_util_page_erase( 0x27F000, 2048);
      rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
-
+	    dim->command = 0;
 	}
-        else if (dimmer_command==DIMMER_OFF)
+    else if (dim->command==DIMMER_OFF)
 	    {
      PRINTF("Switch off dimmer\n\r");
      PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
@@ -368,10 +376,10 @@ dim_chan0.Tconst = 0;
      dim->current_state = DIMMER_DISABLED;
      rom_util_page_erase( 0x27F000, 2048);
      rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
-
+	    dim->command = 0;
 	    }
 
-	    dim->command = 0;
+
          printf("!!!!!!!!!!!!!!!!!\n\r");
 
 
@@ -501,8 +509,8 @@ PROCESS_THREAD(btn_process, ev, data)
     }
     else if((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3)  {
      printf("Onboard button long button press!\n\r");
-     dimmer_command = DIMMER_CYCLE_DIMMING;
-     process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, NULL);
+     dim_chan0.command = DIMMER_CYCLE_DIMMING;
+     process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, &dim_chan0);
     }
    } //button_onboard_sensor
 
