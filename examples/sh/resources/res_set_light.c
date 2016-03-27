@@ -46,24 +46,58 @@
 #include "dev/leds.h"
 #include "sh_main.h"
 
+#include "er-coap.h"
+#include "er-plugtest.h"
+
 //extern unsigned char dimmer_command;
+static uint8_t validate_etag[8] = { 0 };
+static uint8_t validate_etag_len = 1;
+static uint8_t validate_change = 1;
+    
+static uint8_t bytes[8] = {0};
+static size_t len = 0;
+
+static void res_post_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
 
-static void res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
+extern sh_dimmer_t dim_chan0;
+
+//static void res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
+//static void res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
 RESOURCE(res_dimmer_set_light,
-         "title=\"Dimmer Set Light\";rt=\"Control\"",
+        "title=\"LEDs: ?color=r|g|b, POST/PUT mode=on|off\";rt=\"Control\"",
          NULL,
-         res_post_handler,
          NULL,
+         res_post_put_handler,
          NULL);
 
 static void
-res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
+res_post_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
-  leds_toggle(LEDS_GREEN);
-  printf("Dimmer On!\r\n");
-  dimmer_command=DIMMER_SET_LIGHT;
-  process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, NULL);
+  size_t len = 0;
+  const char *light = NULL;
+  const char *time = NULL;
+  uint8_t led = 0;
+  int success = 1;
+
+
+  if (REST.get_post_variable(request, "light", &light)) {
+   PRINTF("light value: %u\r\n", atoi(light));
+   dim_chan0.light_to_set = atoi(light);
+   if (REST.get_post_variable(request, "time", &time)) {
+    PRINTF("time value: %u\r\n", atoi(time));
+    dim_chan0.Tconst = atoi(time);
+   }
+  }
+  else {
+    REST.set_response_status(response, REST.status.BAD_REQUEST);
+  }
+
+  dim_chan0.command = DIMMER_SET_LIGHT;
+  process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, &dim_chan0);
 }
+
+
+
 #endif /* PLATFORM_HAS_LEDS */

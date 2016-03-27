@@ -290,10 +290,12 @@ rom_util_memcpy(&dim_chan0, 0x27F000, sizeof(dim_chan0));
 
    PRINTF("Dimmer current state=%x\r\n", dim_chan0.current_state);
 dim_chan0.command = 0;
-dim_chan0.thyristor_open_time = 20;
+dim_chan0.thyristor_open_time = 30;
 dim_chan0.Lmin = 0;
-dim_chan0.Lmax = 100;
+dim_chan0.Lmax = 30;
 dim_chan0.Tconst = 0;
+dim_chan0.current_light=30;
+dim_chan0.current_state = DIMMER_ENABLED;
 
 //    dimming_time=0;
 //    dimmer_current_state=0;
@@ -341,8 +343,8 @@ dim_chan0.Tconst = 0;
 	    dim->command = 0;
 	}
 
-	else if (dim->command==DIMMER_ON) {
-         printf("Toggle Command On!\n\r");
+    else if ((dim->command==DIMMER_ON) && (dim->current_state != DIMMER_ENABLED)) {
+     printf("Toggle Command On!\n\r");
      PRINTF("Switch on dimmer\n\r");
      PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
      PRINTF("Dimmer Lmax: %u\n\r", dim->Lmax);
@@ -351,21 +353,20 @@ dim_chan0.Tconst = 0;
        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
        dim->thyristor_open_time++;
        etimer_reset(&dimmer_timer);
-       } while (dim->thyristor_open_time < dim->Lmax);
+     } while (dim->thyristor_open_time < dim->Lmax);
 
      dim->current_light=dim->Lmax;
      dim->current_state = DIMMER_ENABLED;
 
      rom_util_page_erase( 0x27F000, 2048);
      rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
-	    dim->command = 0;
-	}
-    else if (dim->command==DIMMER_OFF)
-	    {
+     dim->command = 0;
+    }
+    else if ((dim->command==DIMMER_OFF) && (dim->current_state != DIMMER_DISABLED)) {
      PRINTF("Switch off dimmer\n\r");
      PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
      PRINTF("Dimmer Lmin: %u\n\r", dim->Lmin);
-
+     
       etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
      do {
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
@@ -377,9 +378,30 @@ dim_chan0.Tconst = 0;
      dim->current_state = DIMMER_DISABLED;
      rom_util_page_erase( 0x27F000, 2048);
      rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
-	    dim->command = 0;
-	    }
+     dim->command = 0;
+    }
+    else if ((dim->command==DIMMER_SET_LIGHT) && (dim->light_to_set != dim->current_light)) {
+     PRINTF("Dimmer Set Light!\n\r");
+     PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
+     PRINTF("Dimmer Light To Set: %u\n\r", dim->light_to_set);
+     
+      etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
+     do {
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+      if (dim->light_to_set > dim->current_light) dim->thyristor_open_time++;
+       else dim->thyristor_open_time--;
 
+      etimer_reset(&dimmer_timer);
+     } while (dim->thyristor_open_time != dim->light_to_set);
+
+     dim->current_light=dim->light_to_set;
+     dim->Lmax=dim->light_to_set;
+     dim->current_state = DIMMER_ENABLED;
+     rom_util_page_erase( 0x27F000, 2048);
+     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
+     dim->command = 0;
+    }
+    else      dim->command = 0;
 
          printf("!!!!!!!!!!!!!!!!!\n\r");
 

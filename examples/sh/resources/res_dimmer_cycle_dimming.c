@@ -46,25 +46,25 @@
 #include "dev/leds.h"
 #include "sh_main.h"
 
-//extern unsigned char dimmer_command;
+extern sh_dimmer_t dim_chan0;
 
 
-static void res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
+static void res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
 /* A simple actuator example. Toggles the red led */
 RESOURCE(res_dimmer_cycle_dimming,
          "title=\"Dimmer Cycle Dimming\";rt=\"Control\"",
          NULL,
-         res_post_handler,
          NULL,
+         res_put_handler,
          NULL);
 
 static void
-res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
+res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
-  leds_toggle(LEDS_GREEN);
+//  leds_toggle(LEDS_GREEN);
   printf("Dimmer cycle!\r\n");
-  dimmer_command = DIMMER_CYCLE_DIMMING;
-  process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, NULL);
+  dim_chan0.command = DIMMER_CYCLE_DIMMING;
+  process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, &dim_chan0);
 }
 #endif /* PLATFORM_HAS_LEDS */

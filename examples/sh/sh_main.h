@@ -10,6 +10,20 @@
 #define DIMMER_DOWN 0
 
 
+#define DEBUG 1
+#if DEBUG
+#include <stdio.h>
+#define PRINTF(...) printf(__VA_ARGS__)
+#define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((u
+#define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lla
+#else
+#define PRINTF(...)
+#define PRINT6ADDR(addr)
+#define PRINTLLADDR(addr)
+#endif
+
+
+
 extern unsigned char dimmer_command, dimmer_Lmax;
 extern uint32_t dimmer_current_state;
 
@@ -50,6 +64,7 @@ typedef struct {
   uint8_t direction;
   uint8_t command;
   uint8_t current_light;
+  uint8_t light_to_set;
   uint8_t thyristor_open_time;
   struct rtimer thyristor_rtimer;
 

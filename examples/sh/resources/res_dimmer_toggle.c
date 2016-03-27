@@ -46,28 +46,30 @@
 #include "dev/leds.h"
 #include "sh_main.h"
 
-//extern unsigned char dimmer_command;
 
+extern sh_dimmer_t dim_chan0;
 
-static void res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
+static void res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
-/* A simple actuator example. Toggles the red led */
 RESOURCE(res_dimmer_toggle,
          "title=\"Dimmer Toggle\";rt=\"Control\"",
          NULL,
-         res_post_handler,
          NULL,
+         res_put_handler,
          NULL);
 
 static void
-res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
+res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
-  leds_toggle(LEDS_GREEN);
-  printf("Dimmer toggle!\r\n");
-  if (dimmer_command==DIMMER_CYCLE_DIMMING) 
-   dimmer_command = DIMMER_CYCLE_DIMMING_STOP;
-  else dimmer_command = DIMMER_TOGGLE;
+  const char *time = NULL;
 
-  process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, NULL);
+  printf("Dimmer On!\r\n");
+   if (REST.get_post_variable(request, "time", &time)) {
+    PRINTF("time value: %u\r\n", atoi(time));
+    dim_chan0.Tconst = atoi(time);
+   }
+
+  dim_chan0.command = DIMMER_TOGGLE;
+  process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, &dim_chan0);
 }
 #endif /* PLATFORM_HAS_LEDS */
