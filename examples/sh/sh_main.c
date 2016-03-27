@@ -318,24 +318,25 @@ dim_chan0.Tconst = 0;
    if (dim->command==DIMMER_CYCLE_DIMMING)
 	{
 
-	    leds_on(LEDS_ALL);	    
-            etimer_set(&dimmer_timer2, CLOCK_SECOND/16);
+//	    leds_on(LEDS_ALL);	    
+            etimer_set(&dimmer_timer2, CLOCK_SECOND/10);
 	    do {
             PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer2));
 //	     PRINTF("Dimmer direction: %u\n\r", dim->direction);
 //	     PRINTF("Dimmer current state: %u\n\r", dim->current_state);
 //	     PRINTF("Dimmer thyristor open timr: %u\n\r", dim->thyristor_open_time);
-//    	    if (dim->current_state)	dim->direction=DIMMER_DOWN; else dim->direction=DIMMER_UP;
-//	    if (dim->direction==DIMMER_UP) dim->thyristor_open_time++; else dim->thyristor_open_time--;
+    	    if (dim->current_state)	dim->direction=DIMMER_DOWN; else dim->direction=DIMMER_UP;
+	    if (dim->direction==DIMMER_UP) dim->thyristor_open_time++; else dim->thyristor_open_time--;
 
-//	    if (dim->thyristor_open_time==0) dim->current_state=DIMMER_DISABLED;
-//	    else if (dim->thyristor_open_time==100) dim->current_state=DIMMER_ENABLED;
-	dim_chan0.thyristor_open_time = 20;
+	    if (dim->thyristor_open_time==0) dim->current_state=DIMMER_DISABLED;
+	    else if (dim->thyristor_open_time==100) dim->current_state=DIMMER_ENABLED;
 
             etimer_reset(&dimmer_timer2);
 	    } while (dim->command!=DIMMER_CYCLE_DIMMING_STOP);
-//	    dim->Lmax = dim->thyristor_open_time;
-//	    dim->current_state = DIMMER_ENABLED;
+
+	    dim->Lmax = dim->thyristor_open_time;
+	    if (dim->thyristor_open_time) dim->current_state=DIMMER_ENABLED;
+             else dim->current_state=DIMMER_DISABLED;
 	    printf("Dimmer value after cycle dimming: %u\n\r",dim->Lmax);
 	    dim->command = 0;
 	}
