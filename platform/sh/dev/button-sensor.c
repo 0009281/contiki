@@ -162,7 +162,7 @@ btn_callback(uint8_t port, uint8_t pin)
 }
 
 
-static void
+void
 GPIO_timer_callback(void *n)
 {
 static uint8_t GPIO_handle;

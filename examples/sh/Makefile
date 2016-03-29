@@ -1,11 +1,8 @@
 CONTIKI_PROJECT = sh_main
 all: $(CONTIKI_PROJECT)
 
-TARGET_LIBFILES += -lm
+#TARGET_LIBFILES += -lm
 CONTIKI = ../..
-
-
-
 
 CFLAGS += -DPROJECT_CONF_H=\"project-conf.h\"
 
@@ -33,5 +30,7 @@ APPS += er-coap
 APPS += rest-engine
 
 CONTIKI_WITH_IPV6 = 1
+
+
 
 include $(CONTIKI)/Makefile.include

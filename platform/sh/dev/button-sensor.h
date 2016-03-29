@@ -69,7 +69,8 @@ int dimming_time;
 
 /** \brief Common initialiser for all SmartRF Buttons */
 void button_sensor_init();
-static void GPIO_timer_callback(void *);
+void GPIO_timer_callback(void *);
+
 /**
  * @}
  * @}

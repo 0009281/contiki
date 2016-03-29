@@ -1,9 +1,12 @@
+#include <stdlib.h>
+
+
 #define DIMMER_OFF 0xC0
 #define DIMMER_ON 0xC1
 #define DIMMER_TOGGLE 0xC2
-#define DIMMER_CYCLE_DIMMING 0xC3
-#define DIMMER_CYCLE_DIMMING_STOP 0xC4
-#define DIMMER_SET_LIGHT 0xC5
+#define DIMMER_CYCLIC_DIMMING 0xC3
+#define DIMMER_CYCLIC_DIMMING_STOP 0xC4
+#define DIMMER_SET_BRIGHTNESS 0xC5
 #define DIMMER_ENABLED 1
 #define DIMMER_DISABLED 0
 #define DIMMER_UP 1
@@ -64,7 +67,7 @@ typedef struct {
   uint8_t direction;
   uint8_t command;
   uint8_t current_light;
-  uint8_t light_to_set;
+  uint8_t brightness_to_set;
   uint8_t thyristor_open_time;
   struct rtimer thyristor_rtimer;
 

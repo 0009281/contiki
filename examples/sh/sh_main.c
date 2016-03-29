@@ -27,21 +27,7 @@
 
 #include "sh_main.h"
 
-#define DEBUG 1
-#if DEBUG
-#include <stdio.h>
-#define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
-#define PRINTLLADDR(lladdr) PRINTF("[%02x:%02x:%02x:%02x:%02x:%02x]", (lladdr)->addr[0], (lladdr)->addr[1], (lladdr)->addr[2], (lladdr)->addr[3], (lladdr)->addr[4], (lladdr)->addr[5])
-#else
-#define PRINTF(...)
-#define PRINT6ADDR(addr)
-#define PRINTLLADDR(addr)
-#endif
-
-
-static struct etimer et, dimmer_timer, dimmer_timer2, ett;
-static unsigned char dimmer_current_light, dimmer_Lmin=0, dimmer_Tconst=1;
+static struct etimer  dimmer_timer;
 static uint32_t current_sensor_iteration,  current_sensor_value_max, pwr;
 static uint64_t pwr_sum;
 static double current_sensor_value, temp_current_sensor_value;
@@ -52,14 +38,14 @@ unsigned char dimmer_command, dimmer_Lmax=30;
 uint32_t dimmer_current_state=0;
 
 
-extern resource_t  res_toggle, res_dimmer_toggle, res_dimmer_cycle_dimming,  res_dimmer_on,  res_dimmer_off,
-                   res_dimmer_set_light, res_dimmer_get_status;
+extern resource_t  res_toggle, res_dimmer_toggle, res_dimmer_cyclic_dimming, res_dimmer_cyclic_dimming_stop, res_dimmer_on,  res_dimmer_off,
+                   res_dimmer_set_brightness, res_dimmer_get_status;
 
 sh_dimmer_t dim_chan0;
 
 
 rtimer_clock_t rt_now, rt_for;
-static clock_time_t ct;
+//static clock_time_t ct;
 
 //#define FILENAME "test"
 
@@ -98,7 +84,16 @@ PROCESS(current_sensor_process, "Current sensor process");
 PROCESS(er_example_server, "Erbium Example Server");
 AUTOSTART_PROCESSES(&dimmer_process, &btn_process, &er_example_server);
 
+void fram_write(void *data, uint16_t size, uint32_t address)
+{
+//  rom_util_page_erase(address, 2048);
+//  rom_util_program_flash(data, address, size);
+}
 
+void fram_read(void *data, uint16_t size, uint32_t address)
+{
+//  rom_util_memcpy(data, address, size);
+}
 
 /*
 PRCOESS_THREAD(dimmer_thyristor_control, ev, daya(sh_dimmer_t *dim)
@@ -125,11 +120,6 @@ PRCOESS_THREAD(dimmer_thyristor_control, ev, daya(sh_dimmer_t *dim)
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(dimmer_process, ev, data)
 {
-int i;
-int btn_pressed=0;
-static int direction;
-uint32_t tt = 0x55AABBCC;
-
 static sh_dimmer_t *dim;
 
   PROCESS_BEGIN();
@@ -285,7 +275,8 @@ else
 
 */
 
-rom_util_memcpy(&dim_chan0, 0x27F000, sizeof(dim_chan0));
+//rom_util_memcpy(&dim_chan0, 0x27F000, sizeof(dim_chan0));
+fram_read(&dim_chan0, sizeof(dim_chan0), 0x27F000);
 //if (dim_chan0.current_state) {dim_chan0.thyristor_open_time = 30;}
 
    PRINTF("Dimmer current state=%x\r\n", dim_chan0.current_state);
@@ -317,13 +308,13 @@ dim_chan0.current_state = DIMMER_ENABLED;
    } //DIMMER_TOGGLE
 
 
-   if (dim->command==DIMMER_CYCLE_DIMMING)
+   if (dim->command==DIMMER_CYCLIC_DIMMING)
 	{
 
 //	    leds_on(LEDS_ALL);	    
-            etimer_set(&dimmer_timer2, CLOCK_SECOND/10);
+            etimer_set(&dimmer_timer, CLOCK_SECOND/10);
 	    do {
-            PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer2));
+            PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
 //	     PRINTF("Dimmer direction: %u\n\r", dim->direction);
 //	     PRINTF("Dimmer current state: %u\n\r", dim->current_state);
 //	     PRINTF("Dimmer thyristor open timr: %u\n\r", dim->thyristor_open_time);
@@ -333,13 +324,13 @@ dim_chan0.current_state = DIMMER_ENABLED;
 	    if (dim->thyristor_open_time==0) dim->current_state=DIMMER_DISABLED;
 	    else if (dim->thyristor_open_time==100) dim->current_state=DIMMER_ENABLED;
 
-            etimer_reset(&dimmer_timer2);
-	    } while (dim->command!=DIMMER_CYCLE_DIMMING_STOP);
+            etimer_reset(&dimmer_timer);
+	    } while (dim->command!=DIMMER_CYCLIC_DIMMING_STOP);
 
 	    dim->Lmax = dim->thyristor_open_time;
 	    if (dim->thyristor_open_time) dim->current_state=DIMMER_ENABLED;
              else dim->current_state=DIMMER_DISABLED;
-	    printf("Dimmer value after cycle dimming: %u\n\r",dim->Lmax);
+	    printf("Dimmer value after cyclic dimming: %u\n\r",dim->Lmax);
 	    dim->command = 0;
 	}
 
@@ -357,10 +348,8 @@ dim_chan0.current_state = DIMMER_ENABLED;
 
      dim->current_light=dim->Lmax;
      dim->current_state = DIMMER_ENABLED;
-
-     rom_util_page_erase( 0x27F000, 2048);
-     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
      dim->command = 0;
+     fram_write(dim, sizeof(*dim), 0x27F000);
     }
     else if ((dim->command==DIMMER_OFF) && (dim->current_state != DIMMER_DISABLED)) {
      PRINTF("Switch off dimmer\n\r");
@@ -376,29 +365,26 @@ dim_chan0.current_state = DIMMER_ENABLED;
 
      dim->current_light=dim->Lmin;
      dim->current_state = DIMMER_DISABLED;
-     rom_util_page_erase( 0x27F000, 2048);
-     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
-     dim->command = 0;
+     dim->command = 0;     
+     fram_write(dim, sizeof(*dim), 0x27F000);
     }
-    else if ((dim->command==DIMMER_SET_LIGHT) && (dim->light_to_set != dim->current_light)) {
+    else if ((dim->command==DIMMER_SET_BRIGHTNESS) && (dim->brightness_to_set != dim->current_light)) {
      PRINTF("Dimmer Set Light!\n\r");
      PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
-     PRINTF("Dimmer Light To Set: %u\n\r", dim->light_to_set);
+     PRINTF("Dimmer Light To Set: %u\n\r", dim->brightness_to_set);
      
       etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
      do {
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
-      if (dim->light_to_set > dim->current_light) dim->thyristor_open_time++;
+      if (dim->brightness_to_set > dim->current_light) dim->thyristor_open_time++;
        else dim->thyristor_open_time--;
 
       etimer_reset(&dimmer_timer);
-     } while (dim->thyristor_open_time != dim->light_to_set);
+     } while (dim->thyristor_open_time != dim->brightness_to_set);
 
-     dim->current_light=dim->light_to_set;
-     dim->Lmax=dim->light_to_set;
+     dim->current_light=dim->brightness_to_set;
+     dim->Lmax=dim->brightness_to_set;
      dim->current_state = DIMMER_ENABLED;
-     rom_util_page_erase( 0x27F000, 2048);
-     rom_util_program_flash(dim, 0x27F000, sizeof(*dim));
      dim->command = 0;
     }
     else      dim->command = 0;
@@ -447,8 +433,6 @@ PROCESS_THREAD(current_sensor_process, ev, data)
 
   while(1) {
 
-    etimer_set(&ett, CLOCK_SECOND/4096);
-//    etimer_set(&ett, CLOCK_SECOND/100);
     PROCESS_YIELD();
 
 
@@ -496,7 +480,6 @@ PROCESS_THREAD(btn_process, ev, data)
 {
 
  static uint32_t pwr;
- uint16_t j;
 
  PROCESS_BEGIN();
 
@@ -518,8 +501,8 @@ PROCESS_THREAD(btn_process, ev, data)
       dim_chan0.command = DIMMER_TOGGLE;
       process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, &dim_chan0);
      }
-     else if (dim_chan0.command==DIMMER_CYCLE_DIMMING) {
-      dim_chan0.command=DIMMER_CYCLE_DIMMING_STOP;
+     else if (dim_chan0.command==DIMMER_CYCLIC_DIMMING) {
+      dim_chan0.command=DIMMER_CYCLIC_DIMMING_STOP;
      }
     }
     else if(((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
@@ -532,7 +515,7 @@ PROCESS_THREAD(btn_process, ev, data)
     }
     else if((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3)  {
      printf("Onboard button long button press!\n\r");
-     dim_chan0.command = DIMMER_CYCLE_DIMMING;
+     dim_chan0.command = DIMMER_CYCLIC_DIMMING;
      process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, &dim_chan0);
     }
    } //button_onboard_sensor
@@ -629,12 +612,12 @@ PROCESS_THREAD(er_example_server, ev, data)
    * WARNING: Activating twice only means alternate path, not two instances!
    * All static variables are the same for each URI path.
    */
-  rest_activate_resource(&res_toggle, "actuators/toggle");
   rest_activate_resource(&res_dimmer_toggle, "dimmer/toggle");
-  rest_activate_resource(&res_dimmer_cycle_dimming, "dimmer/cycle_dimming");
+  rest_activate_resource(&res_dimmer_cyclic_dimming, "dimmer/cyclic_dimming");
+  rest_activate_resource(&res_dimmer_cyclic_dimming_stop, "dimmer/cyclic_dimming_stop");
   rest_activate_resource(&res_dimmer_on, "dimmer/on");
   rest_activate_resource(&res_dimmer_off, "dimmer/off");
-  rest_activate_resource(&res_dimmer_set_light, "dimmer/set_light");
+  rest_activate_resource(&res_dimmer_set_brightness, "dimmer/set_brightness");
   rest_activate_resource(&res_dimmer_get_status, "dimmer/status");
 
   /* Define application-specific events here. */
