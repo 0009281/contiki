@@ -28,67 +28,23 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <string.h>
+#ifndef CPU_X86_DRIVERS_QUARKX1000_MSG_BUS_H_
+#define CPU_X86_DRIVERS_QUARKX1000_MSG_BUS_H_
 
-#include "contiki.h"
-#include "sys/ctimer.h"
+#include <stdint.h>
 
-#include "i2c.h"
+/* Routines for accessing the message bus.
+ *
+ * The Intel Quark X1000 SoC includes a message bus that is accessible
+ * via PCI configuration registers.  It communicates to various SoC
+ * components such as the Isolated Memory Region (IMR) registers and the
+ * Remote Management Unit.
+ *
+ * Refer to Intel Quark SoC X1000 Datasheet, Section 12.5 for more details on
+ * the message bus.
+ */
 
-#define LSM9DS0_I2C_ADDR 0x6A
-#define WHO_AM_I_ADDR    0x0F
-#define WHO_AM_I_ANSWER  0xD4
+void quarkX1000_msg_bus_read(uint8_t port, uint32_t reg_off, uint32_t *val);
+void quarkX1000_msg_bus_write(uint8_t port, uint32_t reg_off, uint32_t val);
 
-static uint8_t tx_data = WHO_AM_I_ADDR;
-static uint8_t rx_data = 0;
-static struct ctimer timer;
-
-PROCESS(i2c_lsm9ds0_process, "I2C LSM9DS0 Who Am I Process");
-AUTOSTART_PROCESSES(&i2c_lsm9ds0_process);
-/*---------------------------------------------------------------------------*/
-static void
-rx(void)
-{
-  if (rx_data == WHO_AM_I_ANSWER)
-    printf("Who am I register value match!\n");
-  else
-    printf("Who am I register value DOESN'T match! %u\n", rx_data);
-}
-/*---------------------------------------------------------------------------*/
-static void
-tx(void)
-{
-  rx_data = 0;
-
-  quarkX1000_i2c_read(&rx_data, sizeof(rx_data), LSM9DS0_I2C_ADDR);
-}
-/*---------------------------------------------------------------------------*/
-static void
-err(void)
-{
-  printf("Something went wrong. err() callback has been called.\n");
-}
-/*---------------------------------------------------------------------------*/
-static void
-timeout(void *data)
-{
-  quarkX1000_i2c_write(&tx_data, sizeof(tx_data), LSM9DS0_I2C_ADDR);
-
-  ctimer_reset(&timer);
-}
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(i2c_lsm9ds0_process, ev, data)
-{
-  PROCESS_BEGIN();
-
-  quarkX1000_i2c_set_callbacks(rx, tx, err);
-
-  ctimer_set(&timer, CLOCK_SECOND * 5, timeout, NULL);
-
-  printf("I2C LSM9DS0 example is running\n");
-
-  PROCESS_YIELD();
-
-  PROCESS_END();
-}
+#endif /* CPU_X86_DRIVERS_QUARKX1000_MSG_BUS_H_ */

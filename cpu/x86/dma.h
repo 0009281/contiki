@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016, Intel Corporation. All rights reserved.
+ * Copyright (C) 2016, Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,54 +28,13 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
+#ifndef CPU_X86_DMA_H_
+#define CPU_X86_DMA_H_
 
-#include "contiki.h"
-#include "sys/ctimer.h"
+#ifdef X86_CONF_RESTRICT_DMA
+#define ATTR_BSS_DMA __attribute__((section(".dma_bss")))
+#else
+#define ATTR_BSS_DMA
+#endif
 
-#include "gpio.h"
-
-#define PIN_OUTPUT 5
-#define PIN_INTR 6
-
-static struct ctimer timer;
-
-PROCESS(gpio_interrupt_process, "GPIO Interrupt Process");
-AUTOSTART_PROCESSES(&gpio_interrupt_process);
-/*---------------------------------------------------------------------------*/
-static void
-timeout(void *data)
-{
-  /* emulate an interrupt */
-  quarkX1000_gpio_write(PIN_OUTPUT, 0);
-  quarkX1000_gpio_write(PIN_OUTPUT, 1);
-
-  ctimer_reset(&timer);
-}
-/*---------------------------------------------------------------------------*/
-static void
-callback(uint32_t status)
-{
-  printf("GPIO interrupt callback called, status: %d\n", status);
-}
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(gpio_interrupt_process, ev, data)
-{
-  PROCESS_BEGIN();
-
-  quarkX1000_gpio_config(PIN_OUTPUT, QUARKX1000_GPIO_OUT);
-  quarkX1000_gpio_config(PIN_INTR, QUARKX1000_GPIO_INT | QUARKX1000_GPIO_ACTIVE_HIGH | QUARKX1000_GPIO_EDGE);
-
-  quarkX1000_gpio_set_callback(callback);
-
-  quarkX1000_gpio_clock_enable();
-
-  ctimer_set(&timer, CLOCK_SECOND / 2, timeout, NULL);
-
-  printf("GPIO interrupt example is running\n");
-  PROCESS_YIELD();
-
-  quarkX1000_gpio_clock_disable();
-
-  PROCESS_END();
-}
+#endif /* CPU_X86_DMA_H_ */

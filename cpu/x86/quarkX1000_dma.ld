@@ -28,67 +28,24 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <string.h>
+SECTIONS {
 
-#include "contiki.h"
-#include "sys/ctimer.h"
+    /*
+       It would be more natural to use a 1K alignment for this entire section.
+       However, the UEFI GenFw program ratchets up its alignment
+       granularity to the maximum granularity discovered in its input file.
+       Using 1K-alignment perturbs the symbols, hindering debugging.  Thus,
+       this section is simply padded out to the desired alignment and
+       declared to have a section alignment of only 32 bytes.
+    */
+    .bss.dma ALIGN (32) (NOLOAD) :
+    {
+        /* The IMR feature operates at 1K granularity. */
+        . = ALIGN(1K);
+        _sbss_dma_addr = .;
+        *(.dma_bss)
+        . = ALIGN(1K);
+        _ebss_dma_addr = .;
+    }
 
-#include "i2c.h"
-
-#define LSM9DS0_I2C_ADDR 0x6A
-#define WHO_AM_I_ADDR    0x0F
-#define WHO_AM_I_ANSWER  0xD4
-
-static uint8_t tx_data = WHO_AM_I_ADDR;
-static uint8_t rx_data = 0;
-static struct ctimer timer;
-
-PROCESS(i2c_lsm9ds0_process, "I2C LSM9DS0 Who Am I Process");
-AUTOSTART_PROCESSES(&i2c_lsm9ds0_process);
-/*---------------------------------------------------------------------------*/
-static void
-rx(void)
-{
-  if (rx_data == WHO_AM_I_ANSWER)
-    printf("Who am I register value match!\n");
-  else
-    printf("Who am I register value DOESN'T match! %u\n", rx_data);
-}
-/*---------------------------------------------------------------------------*/
-static void
-tx(void)
-{
-  rx_data = 0;
-
-  quarkX1000_i2c_read(&rx_data, sizeof(rx_data), LSM9DS0_I2C_ADDR);
-}
-/*---------------------------------------------------------------------------*/
-static void
-err(void)
-{
-  printf("Something went wrong. err() callback has been called.\n");
-}
-/*---------------------------------------------------------------------------*/
-static void
-timeout(void *data)
-{
-  quarkX1000_i2c_write(&tx_data, sizeof(tx_data), LSM9DS0_I2C_ADDR);
-
-  ctimer_reset(&timer);
-}
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(i2c_lsm9ds0_process, ev, data)
-{
-  PROCESS_BEGIN();
-
-  quarkX1000_i2c_set_callbacks(rx, tx, err);
-
-  ctimer_set(&timer, CLOCK_SECOND * 5, timeout, NULL);
-
-  printf("I2C LSM9DS0 example is running\n");
-
-  PROCESS_YIELD();
-
-  PROCESS_END();
 }

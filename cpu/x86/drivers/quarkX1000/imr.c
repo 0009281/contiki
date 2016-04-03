@@ -28,67 +28,62 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <string.h>
+#include <assert.h>
+#include "imr.h"
+#include "msg-bus.h"
 
-#include "contiki.h"
-#include "sys/ctimer.h"
+#define MEM_MANAGER_PORT 5
 
-#include "i2c.h"
+#define IMR_BASE_OFFSET  0x40
+#define IMR_REG_COUNT    4
 
-#define LSM9DS0_I2C_ADDR 0x6A
-#define WHO_AM_I_ADDR    0x0F
-#define WHO_AM_I_ANSWER  0xD4
+#define IMR_LO_OFFSET    0
+#define IMR_HI_OFFSET    1
+#define IMR_RDMSK_OFFSET 2
+#define IMR_WRMSK_OFFSET 3
 
-static uint8_t tx_data = WHO_AM_I_ADDR;
-static uint8_t rx_data = 0;
-static struct ctimer timer;
-
-PROCESS(i2c_lsm9ds0_process, "I2C LSM9DS0 Who Am I Process");
-AUTOSTART_PROCESSES(&i2c_lsm9ds0_process);
 /*---------------------------------------------------------------------------*/
-static void
-rx(void)
+/**
+ * \brief Read the contents of the specified IMR.
+ */
+quarkX1000_imr_t
+quarkX1000_imr_read(uint32_t imr_idx)
 {
-  if (rx_data == WHO_AM_I_ANSWER)
-    printf("Who am I register value match!\n");
-  else
-    printf("Who am I register value DOESN'T match! %u\n", rx_data);
+  quarkX1000_imr_t imr;
+  uint32_t reg_base = IMR_BASE_OFFSET + (IMR_REG_COUNT * imr_idx);
+
+  assert(imr_idx < QUARKX1000_IMR_CNT);
+
+  quarkX1000_msg_bus_read(MEM_MANAGER_PORT,
+                          reg_base + IMR_LO_OFFSET, &imr.lo.raw);
+  quarkX1000_msg_bus_read(MEM_MANAGER_PORT,
+                          reg_base + IMR_HI_OFFSET, &imr.hi.raw);
+  quarkX1000_msg_bus_read(MEM_MANAGER_PORT,
+                          reg_base + IMR_RDMSK_OFFSET, &imr.rdmsk.raw);
+  quarkX1000_msg_bus_read(MEM_MANAGER_PORT,
+                          reg_base + IMR_WRMSK_OFFSET, &imr.wrmsk.raw);
+
+  return imr;
 }
 /*---------------------------------------------------------------------------*/
-static void
-tx(void)
+/**
+ * \brief Overwrite the contents of the specified IMR.
+ */
+void
+quarkX1000_imr_write(uint32_t imr_idx, quarkX1000_imr_t imr)
 {
-  rx_data = 0;
+  uint32_t reg_base = IMR_BASE_OFFSET + (IMR_REG_COUNT * imr_idx);
 
-  quarkX1000_i2c_read(&rx_data, sizeof(rx_data), LSM9DS0_I2C_ADDR);
+  assert(imr_idx < QUARKX1000_IMR_CNT);
+
+  quarkX1000_msg_bus_write(MEM_MANAGER_PORT,
+                           reg_base + IMR_HI_OFFSET, imr.hi.raw);
+  quarkX1000_msg_bus_write(MEM_MANAGER_PORT,
+                           reg_base + IMR_RDMSK_OFFSET, imr.rdmsk.raw);
+  quarkX1000_msg_bus_write(MEM_MANAGER_PORT,
+                           reg_base + IMR_WRMSK_OFFSET, imr.wrmsk.raw);
+  /* This register must be programmed last, in case it sets the lock bit. */
+  quarkX1000_msg_bus_write(MEM_MANAGER_PORT,
+                           reg_base + IMR_LO_OFFSET, imr.lo.raw);
 }
 /*---------------------------------------------------------------------------*/
-static void
-err(void)
-{
-  printf("Something went wrong. err() callback has been called.\n");
-}
-/*---------------------------------------------------------------------------*/
-static void
-timeout(void *data)
-{
-  quarkX1000_i2c_write(&tx_data, sizeof(tx_data), LSM9DS0_I2C_ADDR);
-
-  ctimer_reset(&timer);
-}
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(i2c_lsm9ds0_process, ev, data)
-{
-  PROCESS_BEGIN();
-
-  quarkX1000_i2c_set_callbacks(rx, tx, err);
-
-  ctimer_set(&timer, CLOCK_SECOND * 5, timeout, NULL);
-
-  printf("I2C LSM9DS0 example is running\n");
-
-  PROCESS_YIELD();
-
-  PROCESS_END();
-}

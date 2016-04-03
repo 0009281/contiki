@@ -28,67 +28,9 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <string.h>
+#ifndef CPU_X86_DRIVERS_QUARKX1000_IMR_CONF_H_
+#define CPU_X86_DRIVERS_QUARKX1000_IMR_CONF_H_
 
-#include "contiki.h"
-#include "sys/ctimer.h"
+void quarkX1000_imr_conf(void);
 
-#include "i2c.h"
-
-#define LSM9DS0_I2C_ADDR 0x6A
-#define WHO_AM_I_ADDR    0x0F
-#define WHO_AM_I_ANSWER  0xD4
-
-static uint8_t tx_data = WHO_AM_I_ADDR;
-static uint8_t rx_data = 0;
-static struct ctimer timer;
-
-PROCESS(i2c_lsm9ds0_process, "I2C LSM9DS0 Who Am I Process");
-AUTOSTART_PROCESSES(&i2c_lsm9ds0_process);
-/*---------------------------------------------------------------------------*/
-static void
-rx(void)
-{
-  if (rx_data == WHO_AM_I_ANSWER)
-    printf("Who am I register value match!\n");
-  else
-    printf("Who am I register value DOESN'T match! %u\n", rx_data);
-}
-/*---------------------------------------------------------------------------*/
-static void
-tx(void)
-{
-  rx_data = 0;
-
-  quarkX1000_i2c_read(&rx_data, sizeof(rx_data), LSM9DS0_I2C_ADDR);
-}
-/*---------------------------------------------------------------------------*/
-static void
-err(void)
-{
-  printf("Something went wrong. err() callback has been called.\n");
-}
-/*---------------------------------------------------------------------------*/
-static void
-timeout(void *data)
-{
-  quarkX1000_i2c_write(&tx_data, sizeof(tx_data), LSM9DS0_I2C_ADDR);
-
-  ctimer_reset(&timer);
-}
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(i2c_lsm9ds0_process, ev, data)
-{
-  PROCESS_BEGIN();
-
-  quarkX1000_i2c_set_callbacks(rx, tx, err);
-
-  ctimer_set(&timer, CLOCK_SECOND * 5, timeout, NULL);
-
-  printf("I2C LSM9DS0 example is running\n");
-
-  PROCESS_YIELD();
-
-  PROCESS_END();
-}
+#endif /* CPU_X86_DRIVERS_QUARKX1000_IMR_CONF_H_ */
