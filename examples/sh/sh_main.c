@@ -26,6 +26,8 @@
 #include "rest-engine.h"
 
 #include "sh_main.h"
+#include "er-coap-engine.h"
+
 
 static struct etimer  dimmer_timer;
 static uint32_t current_sensor_iteration,  current_sensor_value_max, pwr;
@@ -93,6 +95,18 @@ void fram_write(void *data, uint16_t size, uint32_t address)
 void fram_read(void *data, uint16_t size, uint32_t address)
 {
 //  rom_util_memcpy(data, address, size);
+}
+
+
+/* This function is will be passed to COAP_BLOCKING_REQUEST() to handle responses. */
+void
+client_chunk_handler(void *response)
+{
+  const uint8_t *chunk;
+
+  int len = coap_get_payload(response, &chunk);
+
+  printf("|%.*s", len, (char *)chunk);
 }
 
 /*
@@ -478,10 +492,30 @@ PROCESS_THREAD(current_sensor_process, ev, data)
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(btn_process, ev, data)
 {
+/* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
+#define SERVER_NODE(ipaddr)   uip_ip6addr(ipaddr, 0x64, 0xff9b, 0x0, 0x0, 0x0, 0x0, 0xa8c0, 0x7702)      /* cooja2 */
+//#define SERVER_NODE(ipaddr)   uip_ip6addr(ipaddr, 0xbbbb, 0x0, 0x0, 0x0, 0xa115, 0xc858, 0x9288, 0xc1c7)      /* cooja2 */
 
- static uint32_t pwr;
+#define LOCAL_PORT      UIP_HTONS(COAP_DEFAULT_PORT + 1)
+#define REMOTE_PORT     UIP_HTONS(COAP_DEFAULT_PORT)
+/* Example URIs that can be queried. */
+#define NUMBER_OF_URLS 4
+
+  uip_ip4addr_t ip4addr;
+  uip_ip6addr_t server_ipaddr;
+
+  static uint32_t pwr;
+//  static   uip_ipaddr_t server_ipaddr;
+  static coap_packet_t request[1];      /* This way the packet can be treated as pointer as usual. */
+/* leading and ending slashes only for demo purposes, get cropped automatically when setting the Uri-Path */
+char *service_urls[NUMBER_OF_URLS] =
+{ ".well-known/core", "/buttons/toggle", "battery/", "error/in//path" };
+
+char coap_msg[255];
 
  PROCESS_BEGIN();
+
+
 
  printf("Beginning of Button process\n");
 
@@ -507,10 +541,11 @@ PROCESS_THREAD(btn_process, ev, data)
     }
     else if(((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
      printf("Onboard button middle button press!\n\r");
+
 //     dim_chan0.thyristor_open_time--;
-     dim_chan0.Tconst++;
+//     dim_chan0.Tconst++;
 //     PRINTF("Dimmer open time: %u\n\r", dim_chan0.thyristor_open_time);
-     PRINTF("Dimmer Tconst: %u\n\r", dim_chan0.Tconst);
+//     PRINTF("Dimmer Tconst: %u\n\r", dim_chan0.Tconst);
 
     }
     else if((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3)  {
@@ -525,11 +560,30 @@ PROCESS_THREAD(btn_process, ev, data)
     printf("GPIO0 button: Pin = %d, press duration %d clock ticks\n\r", (&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_STATE), (&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION));
 
     if((&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) < CLOCK_SECOND*0.7) {
-     printf("GPIO0 button short press\n\r");
+      printf("GPIO0 button short press\n\r");
+      SERVER_NODE(&server_ipaddr);
+      uip_ipaddr(&ip4addr, 192,168,2,92);
+      ip64_addr_4to6(&ip4addr, &server_ipaddr);
+      coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
+      sprintf(coap_msg,"MAC=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\buttons=GPIO0&event=1", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1], linkaddr_node_addr.u8[2], linkaddr_node_addr.u8[3], linkaddr_node_addr.u8[4], linkaddr_node_addr.u8[5], linkaddr_node_addr.u8[6], linkaddr_node_addr.u8[7]);
+      coap_set_payload(request, (uint8_t *)coap_msg, strlen(coap_msg));
+      PRINT6ADDR(&server_ipaddr);
+      PRINTF(" : %u\n", UIP_HTONS(REMOTE_PORT));
+      COAP_BLOCKING_REQUEST(&server_ipaddr, REMOTE_PORT, request, client_chunk_handler);
     }
 
     else if(((&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
      printf("GPIO0 button middle button press!\n\r");
+      SERVER_NODE(&server_ipaddr);
+      uip_ipaddr(&ip4addr, 192,168,2,92);
+      ip64_addr_4to6(&ip4addr, &server_ipaddr);
+      coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
+      sprintf(coap_msg,"MAC=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\buttons=GPIO0&event=2", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1], linkaddr_node_addr.u8[2], linkaddr_node_addr.u8[3], linkaddr_node_addr.u8[4], linkaddr_node_addr.u8[5], linkaddr_node_addr.u8[6], linkaddr_node_addr.u8[7]);
+      coap_set_payload(request, (uint8_t *)coap_msg, strlen(coap_msg));
+      PRINT6ADDR(&server_ipaddr);
+      PRINTF(" : %u\n", UIP_HTONS(REMOTE_PORT));
+      COAP_BLOCKING_REQUEST(&server_ipaddr, REMOTE_PORT, request, client_chunk_handler);
+
     }
 
     else if((&button_GPIO0_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3) {
@@ -543,10 +597,30 @@ PROCESS_THREAD(btn_process, ev, data)
 
     if((&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) < CLOCK_SECOND*0.7) {
      printf("GPIO1 button short press\n\r");
+      SERVER_NODE(&server_ipaddr);
+      uip_ipaddr(&ip4addr, 192,168,2,92);
+      ip64_addr_4to6(&ip4addr, &server_ipaddr);
+      coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
+      sprintf(coap_msg,"MAC=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\buttons=GPIO1&event=1", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1], linkaddr_node_addr.u8[2], linkaddr_node_addr.u8[3], linkaddr_node_addr.u8[4], linkaddr_node_addr.u8[5], linkaddr_node_addr.u8[6], linkaddr_node_addr.u8[7]);
+      coap_set_payload(request, (uint8_t *)coap_msg, strlen(coap_msg));
+      PRINT6ADDR(&server_ipaddr);
+      PRINTF(" : %u\n", UIP_HTONS(REMOTE_PORT));
+      COAP_BLOCKING_REQUEST(&server_ipaddr, REMOTE_PORT, request, client_chunk_handler);
+
     }
 
     else if(((&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
      printf("GPIO1 button middle button press!\n\r");
+      SERVER_NODE(&server_ipaddr);
+      uip_ipaddr(&ip4addr, 192,168,2,92);
+      ip64_addr_4to6(&ip4addr, &server_ipaddr);
+      coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
+      sprintf(coap_msg,"MAC=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\buttons=GPIO1&event=2", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1], linkaddr_node_addr.u8[2], linkaddr_node_addr.u8[3], linkaddr_node_addr.u8[4], linkaddr_node_addr.u8[5], linkaddr_node_addr.u8[6], linkaddr_node_addr.u8[7]);
+      coap_set_payload(request, (uint8_t *)coap_msg, strlen(coap_msg));
+      PRINT6ADDR(&server_ipaddr);
+      PRINTF(" : %u\n", UIP_HTONS(REMOTE_PORT));
+      COAP_BLOCKING_REQUEST(&server_ipaddr, REMOTE_PORT, request, client_chunk_handler);
+
     }
 
     else if((&button_GPIO1_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3) {
@@ -560,10 +634,30 @@ PROCESS_THREAD(btn_process, ev, data)
 
     if((&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) < CLOCK_SECOND*0.7) {
      printf("GPIO2 button short press\n\r");
+      SERVER_NODE(&server_ipaddr);
+      uip_ipaddr(&ip4addr, 192,168,2,92);
+      ip64_addr_4to6(&ip4addr, &server_ipaddr);
+      coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
+      sprintf(coap_msg,"MAC=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\buttons=GPIO2&event=1", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1], linkaddr_node_addr.u8[2], linkaddr_node_addr.u8[3], linkaddr_node_addr.u8[4], linkaddr_node_addr.u8[5], linkaddr_node_addr.u8[6], linkaddr_node_addr.u8[7]);
+      coap_set_payload(request, (uint8_t *)coap_msg, strlen(coap_msg));
+      PRINT6ADDR(&server_ipaddr);
+      PRINTF(" : %u\n", UIP_HTONS(REMOTE_PORT));
+      COAP_BLOCKING_REQUEST(&server_ipaddr, REMOTE_PORT, request, client_chunk_handler);
+
     }
 
     else if(((&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
      printf("GPIO2 button middle button press!\n\r");
+      SERVER_NODE(&server_ipaddr);
+      uip_ipaddr(&ip4addr, 192,168,2,92);
+      ip64_addr_4to6(&ip4addr, &server_ipaddr);
+      coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
+      sprintf(coap_msg,"MAC=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\buttons=GPIO2&event=2", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1], linkaddr_node_addr.u8[2], linkaddr_node_addr.u8[3], linkaddr_node_addr.u8[4], linkaddr_node_addr.u8[5], linkaddr_node_addr.u8[6], linkaddr_node_addr.u8[7]);
+      coap_set_payload(request, (uint8_t *)coap_msg, strlen(coap_msg));
+      PRINT6ADDR(&server_ipaddr);
+      PRINTF(" : %u\n", UIP_HTONS(REMOTE_PORT));
+      COAP_BLOCKING_REQUEST(&server_ipaddr, REMOTE_PORT, request, client_chunk_handler);
+
     }
 
     else if((&button_GPIO2_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*3) {
@@ -603,6 +697,10 @@ PROCESS_THREAD(er_example_server, ev, data)
   PRINTF("LL header: %u\n", UIP_LLH_LEN);
   PRINTF("IP+UDP header: %u\n", UIP_IPUDPH_LEN);
   PRINTF("REST max chunk: %u\n", REST_MAX_CHUNK_SIZE);
+
+  /* receives all CoAP messages */
+//  coap_init_engine();
+
 
   /* Initialize the REST engine. */
   rest_init_engine();
