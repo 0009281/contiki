@@ -7,10 +7,16 @@
 #define DIMMER_CYCLIC_DIMMING 0xC3
 #define DIMMER_CYCLIC_DIMMING_STOP 0xC4
 #define DIMMER_SET_BRIGHTNESS 0xC5
+#define DIMMER_UP 0xC6
+#define DIMMER_DOWN 0xC7
+
+
+
+
 #define DIMMER_ENABLED 1
 #define DIMMER_DISABLED 0
-#define DIMMER_UP 1
-#define DIMMER_DOWN 0
+#define DIMMER_UP_STATE 1
+#define DIMMER_DOWN_STATE 0
 
 
 #define DEBUG 1
@@ -31,9 +37,11 @@ extern unsigned char dimmer_command, dimmer_Lmax;
 extern uint32_t dimmer_current_state;
 
 
+
 /* Global configuration */
 typedef struct  {
 //  uint8_t dimmer_command;
+
   uint8_t Lmin;
   uint8_t Lmax;
   uint8_t Tconst;

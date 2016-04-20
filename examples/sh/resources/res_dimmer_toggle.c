@@ -24,10 +24,11 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 
   PRINTF("Dimmer Toggle\r\n");
    if (REST.get_post_variable(request, "time", &time)) {
-    PRINTF("Dimmer Toggletime value: %u\r\n", atoi(time));
     dim_chan0.Tconst = atoi(time);
    }
+  else  dim_chan0.Tconst = dim_chan0.config_fram.Tconst;
 
+    PRINTF("Dimmer Toggletime value: %u\r\n", dim_chan0.Tconst);
   dim_chan0.command = DIMMER_TOGGLE;
   process_post(&dimmer_process, PROCESS_EVENT_CONTINUE, &dim_chan0);
 }

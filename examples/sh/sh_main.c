@@ -36,12 +36,16 @@ static double current_sensor_value, temp_current_sensor_value;
 //extern int dimming_time;
 
 
+const char device_name[]="SH Triac Dimmer";
+const char device_firmware[]="1.1";
+
+
 unsigned char dimmer_command, dimmer_Lmax=30;
 uint32_t dimmer_current_state=0;
 
 
-extern resource_t  res_toggle, res_dimmer_toggle, res_dimmer_cyclic_dimming, res_dimmer_cyclic_dimming_stop, res_dimmer_on,  res_dimmer_off,
-                   res_dimmer_set_brightness, res_dimmer_get_status;
+extern resource_t  res_toggle, res_dimmer_toggle, res_dimmer_cycle_start, res_dimmer_stop, res_dimmer_on,  res_dimmer_off,
+                   res_dimmer_set_brightness, res_dimmer_get_status, res_dimmer_get_info, res_dimmer_up_start, res_dimmer_down_start;
 
 sh_dimmer_t dim_chan0;
 
@@ -298,7 +302,7 @@ dim_chan0.command = 0;
 dim_chan0.thyristor_open_time = 30;
 dim_chan0.Lmin = 0;
 dim_chan0.Lmax = 30;
-dim_chan0.Tconst = 0;
+dim_chan0.Tconst = 1;
 dim_chan0.current_light=30;
 dim_chan0.current_state = DIMMER_ENABLED;
 
@@ -332,8 +336,8 @@ dim_chan0.current_state = DIMMER_ENABLED;
 //	     PRINTF("Dimmer direction: %u\n\r", dim->direction);
 //	     PRINTF("Dimmer current state: %u\n\r", dim->current_state);
 //	     PRINTF("Dimmer thyristor open timr: %u\n\r", dim->thyristor_open_time);
-    	    if (dim->current_state)	dim->direction=DIMMER_DOWN; else dim->direction=DIMMER_UP;
-	    if (dim->direction==DIMMER_UP) dim->thyristor_open_time++; else dim->thyristor_open_time--;
+    	    if (dim->current_state)	dim->direction=DIMMER_DOWN_STATE; else dim->direction=DIMMER_UP_STATE;
+	    if (dim->direction==DIMMER_UP_STATE) dim->thyristor_open_time++; else dim->thyristor_open_time--;
 
 	    if (dim->thyristor_open_time==0) dim->current_state=DIMMER_DISABLED;
 	    else if (dim->thyristor_open_time==100) dim->current_state=DIMMER_ENABLED;
@@ -353,9 +357,14 @@ dim_chan0.current_state = DIMMER_ENABLED;
      PRINTF("Switch on dimmer\n\r");
      PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
      PRINTF("Dimmer Lmax: %u\n\r", dim->Lmax);
+     PRINTF("Dimmer current_light: %u\n\r", dim->current_light);
        etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
      do {
        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+//       clock_delay_usec(500000*(dim->Tconst)/abs(dim->Lmax - dim->current_light));
+       //PRINTF("Rtimer now: %lu\n\r", RTIMER_NOW())     ;
+       //clock_delay_usec(65535);
+       //PRINTF("Rtimer now: %lu\n\r", RTIMER_NOW())     ;
        dim->thyristor_open_time++;
        etimer_reset(&dimmer_timer);
      } while (dim->thyristor_open_time < dim->Lmax);
@@ -369,10 +378,12 @@ dim_chan0.current_state = DIMMER_ENABLED;
      PRINTF("Switch off dimmer\n\r");
      PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
      PRINTF("Dimmer Lmin: %u\n\r", dim->Lmin);
-     
+     PRINTF("Dimmer current_light: %u\n\r", dim->current_light);
+
       etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
      do {
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
+      // clock_delay_usec(500000*(dim->Tconst)/abs(dim->current_light - dim->Lmin));
       dim->thyristor_open_time--;
       etimer_reset(&dimmer_timer);
      } while (dim->thyristor_open_time > dim->Lmin);
@@ -387,13 +398,15 @@ dim_chan0.current_state = DIMMER_ENABLED;
      PRINTF("Dimmer open time: %u\n\r", dim->thyristor_open_time);
      PRINTF("Dimmer Light To Set: %u\n\r", dim->brightness_to_set);
      
-      etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
+      //etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(dim->Lmax-dim->Lmin));
+      etimer_set(&dimmer_timer, CLOCK_SECOND*dim->Tconst/(abs(dim->brightness_to_set - dim->current_light) ));
      do {
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&dimmer_timer));
-      if (dim->brightness_to_set > dim->current_light) dim->thyristor_open_time++;
+       //1=0.5s delay
+       //clock_delay_usec(500000*dim->Tconst/abs(dim->brightness_to_set - dim->current_light));
+       if (dim->brightness_to_set > dim->current_light) dim->thyristor_open_time++;
        else dim->thyristor_open_time--;
-
-      etimer_reset(&dimmer_timer);
+       etimer_reset(&dimmer_timer);
      } while (dim->thyristor_open_time != dim->brightness_to_set);
 
      dim->current_light=dim->brightness_to_set;
@@ -711,12 +724,16 @@ PROCESS_THREAD(er_example_server, ev, data)
    * All static variables are the same for each URI path.
    */
   rest_activate_resource(&res_dimmer_toggle, "dimmer/toggle");
-  rest_activate_resource(&res_dimmer_cyclic_dimming, "dimmer/cyclic_dimming");
-  rest_activate_resource(&res_dimmer_cyclic_dimming_stop, "dimmer/cyclic_dimming_stop");
+  rest_activate_resource(&res_dimmer_cycle_start, "dimmer/cycle_start");
+  rest_activate_resource(&res_dimmer_stop, "dimmer/stop");
+  rest_activate_resource(&res_dimmer_up_start, "dimmer/up_start");
+  rest_activate_resource(&res_dimmer_down_start, "dimmer/down_start");
+
   rest_activate_resource(&res_dimmer_on, "dimmer/on");
   rest_activate_resource(&res_dimmer_off, "dimmer/off");
   rest_activate_resource(&res_dimmer_set_brightness, "dimmer/set_brightness");
   rest_activate_resource(&res_dimmer_get_status, "dimmer/status");
+  rest_activate_resource(&res_dimmer_get_info, "dimmer/info");
 
   /* Define application-specific events here. */
   while(1) {
