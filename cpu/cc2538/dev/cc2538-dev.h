@@ -93,10 +93,18 @@
  * @{
  */
 /** Flash address */
-#define CC2538_DEV_FLASH_ADDR   0x00200000
+// moroz >>
+//#define CC2538_DEV_FLASH_ADDR   0x00200000
+#define CC2538_DEV_FLASH_ADDR   0x0023E000
+// << moroz
 /** Flash size in bytes */
-#define CC2538_DEV_FLASH_SIZE   (((CC2538_DEV & CC2538_DEV_FLASH_SIZE_KB_M) >> \
-                                  CC2538_DEV_FLASH_SIZE_KB_S) << 10)
+// moroz >>
+//#define CC2538_DEV_FLASH_SIZE   (((CC2538_DEV & CC2538_DEV_FLASH_SIZE_KB_M) >> \
+//                                  CC2538_DEV_FLASH_SIZE_KB_S) << 10)
+#define CC2538_DEV_FLASH_SIZE 0x40000
+// << moroz
+
+
 /** SRAM (non-retention + low-leakage) address */
 #define CC2538_DEV_SRAM_ADDR    (CC2538_DEV_RLSRAM_SIZE ? \
                                  CC2538_DEV_RLSRAM_ADDR : \

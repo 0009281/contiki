@@ -1,0 +1,97 @@
+/**
+ * \file
+ *      COAP command from server: Dimmer Up
+ */
+
+#include "rest-engine.h"
+#include "sh_main.h"
+#include "er-coap.h"
+#include "dev/rom-util.h"
+
+
+#define MAX_PLUGFEST_PAYLOAD 64 + 1       /* +1 for the terminating zero, which is not transmitted */
+#define FIRMWARE_SIZE  65535
+
+extern sh_dimmer_t dim_chan0;
+static int32_t large_update_size = 0;
+static uint8_t large_update_store[4096] = { 0 };
+static struct etimer  firmware_erase_timer;
+
+//static unsigned int large_update_ct = APPLICATION_OCTET_STREAM;
+
+
+static void res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
+
+RESOURCE(res_dimmer_firmware,
+         "title=\"Update firmware\";rt=\"Control\"",
+         NULL,
+         NULL,
+         res_put_handler,
+         NULL);
+
+static void
+res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
+{
+  coap_packet_t *const coap_req = (coap_packet_t *)request;
+  uint8_t *incoming = NULL;
+  size_t len = 0;
+
+  unsigned int ct = -1;
+//preferred_size, *offset only for GEt method!!!
+
+
+/*
+  if(!REST.get_header_content_type(request, &ct)) {
+    REST.set_response_status(response, REST.status.BAD_REQUEST);
+    const char *error_msg = "NoContentType";
+    REST.set_response_payload(response, error_msg, strlen(error_msg));
+    return;
+  }
+*/
+
+  if((len = REST.get_request_payload(request, (const uint8_t **)&incoming))) {
+
+      printf("block number: %d\n", coap_req->block1_num);
+      printf("block size: %d\n", coap_req->block1_size);
+      printf("preferred size: %d\n", preferred_size);
+      printf("len: %d\n", len);
+      printf("offset: %d\n", *offset);
+/*    if((coap_req->block1_num >= 10)) {
+      printf("Start flash erasing!\n");
+//      etimer_set(&firmware_erase_timer, CLOCK_SECOND/100);
+//      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&firmware_erase_timer));
+//      while (!etimer_expired(&firmware_erase_timer));
+      coap_set_status_code(response, CONTINUE_2_31);
+      coap_set_header_block1(response, coap_req->block1_num, 1, coap_req->block1_size);
+//      REST.set_response_payload(response, buffer, snprintf((char *)buffer, MAX_PLUGFEST_PAYLOAD, "Wait 0 %d\n",0));
+      return;
+    }
+*/
+    if(coap_req->block1_num * coap_req->block1_size + len <= FIRMWARE_SIZE) {
+//      memcpy(large_update_store + coap_req->block1_num * coap_req->block1_size,        incoming, len);
+//      large_update_size = coap_req->block1_num * coap_req->block1_size + len;
+//      large_update_ct = ct;
+      rom_util_program_flash(incoming, 0x278000 + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
+
+
+      if (!coap_req->block1_more) REST.set_response_status(response, REST.status.CHANGED);
+        else        coap_set_status_code(response, CONTINUE_2_31);
+
+      coap_set_header_block1(response, coap_req->block1_num, 0, coap_req->block1_size);
+    } else {
+      REST.set_response_status(response,
+                               REST.status.REQUEST_ENTITY_TOO_LARGE);
+      REST.set_response_payload(
+        response,
+        buffer,
+        snprintf((char *)buffer, MAX_PLUGFEST_PAYLOAD, "%uB max.",
+                 sizeof(large_update_store)));
+      return;
+    }
+  } else {
+    REST.set_response_status(response, REST.status.BAD_REQUEST);
+    const char *error_msg = "NoPayload";
+    REST.set_response_payload(response, error_msg, strlen(error_msg));
+    return;
+  }
+}

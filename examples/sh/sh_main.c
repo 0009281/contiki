@@ -45,7 +45,8 @@ uint32_t dimmer_current_state=0;
 
 
 extern resource_t  res_toggle, res_dimmer_toggle, res_dimmer_cycle_start, res_dimmer_stop, res_dimmer_on,  res_dimmer_off,
-                   res_dimmer_set_brightness, res_dimmer_get_status, res_dimmer_get_info, res_dimmer_up_start, res_dimmer_down_start;
+                   res_dimmer_set_brightness, res_dimmer_get_status, res_dimmer_get_info, res_dimmer_up_start, res_dimmer_down_start,
+                   res_dimmer_firmware;
 
 sh_dimmer_t dim_chan0;
 
@@ -294,7 +295,7 @@ else
 */
 
 //rom_util_memcpy(&dim_chan0, 0x27F000, sizeof(dim_chan0));
-fram_read(&dim_chan0, sizeof(dim_chan0), 0x27F000);
+//fram_read(&dim_chan0, sizeof(dim_chan0), 0x27F000);
 //if (dim_chan0.current_state) {dim_chan0.thyristor_open_time = 30;}
 
    PRINTF("Dimmer current state=%x\r\n", dim_chan0.current_state);
@@ -372,7 +373,7 @@ dim_chan0.current_state = DIMMER_ENABLED;
      dim->current_light=dim->Lmax;
      dim->current_state = DIMMER_ENABLED;
      dim->command = 0;
-     fram_write(dim, sizeof(*dim), 0x27F000);
+//     fram_write(dim, sizeof(*dim), 0x27F000);
     }
     else if ((dim->command==DIMMER_OFF) && (dim->current_state != DIMMER_DISABLED)) {
      PRINTF("Switch off dimmer\n\r");
@@ -391,7 +392,7 @@ dim_chan0.current_state = DIMMER_ENABLED;
      dim->current_light=dim->Lmin;
      dim->current_state = DIMMER_DISABLED;
      dim->command = 0;     
-     fram_write(dim, sizeof(*dim), 0x27F000);
+//     fram_write(dim, sizeof(*dim), 0x27F000);
     }
     else if ((dim->command==DIMMER_SET_BRIGHTNESS) && (dim->brightness_to_set != dim->current_light)) {
      PRINTF("Dimmer Set Light!\n\r");
@@ -734,6 +735,7 @@ PROCESS_THREAD(er_example_server, ev, data)
   rest_activate_resource(&res_dimmer_set_brightness, "dimmer/set_brightness");
   rest_activate_resource(&res_dimmer_get_status, "dimmer/status");
   rest_activate_resource(&res_dimmer_get_info, "dimmer/info");
+  rest_activate_resource(&res_dimmer_firmware, "dimmer/firmware");
 
   /* Define application-specific events here. */
   while(1) {

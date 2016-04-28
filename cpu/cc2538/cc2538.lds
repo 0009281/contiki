@@ -87,7 +87,7 @@ SECTIONS
     .ARM.exidx :
     {
         *(.ARM.exidx*)
-    } > FLASH_FW
+    } > FLASH_FW 
 
     .bss :
     {
