@@ -20,6 +20,19 @@ static struct etimer  firmware_erase_timer;
 //static unsigned int large_update_ct = APPLICATION_OCTET_STREAM;
 
 
+uint32_t calc4summ(uint32_t *ptr, uint16_t count) {
+  uint32_t res = 0;
+
+  while(count > 0) {
+    res = res + ptr[count - 1];
+    count = count -1;
+  }
+
+  return res;
+}
+
+
+
 static void res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
 RESOURCE(res_dimmer_firmware,
@@ -71,7 +84,7 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 //      memcpy(large_update_store + coap_req->block1_num * coap_req->block1_size,        incoming, len);
 //      large_update_size = coap_req->block1_num * coap_req->block1_size + len;
 //      large_update_ct = ct;
-      rom_util_program_flash(incoming, 0x278000 + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
+      rom_util_program_flash(incoming, 0x23e000 + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
 
 
       if (!coap_req->block1_more) REST.set_response_status(response, REST.status.CHANGED);

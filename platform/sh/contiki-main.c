@@ -184,8 +184,8 @@ main(void)
   INTERRUPTS_ENABLE();
   fade(LEDS_GREEN);
 
-  leds_on(LEDS_GREEN);
-  leds_on(LEDS_RED);
+//  leds_on(LEDS_GREEN);
+//  leds_on(LEDS_RED);
 
   PUTS(CONTIKI_VERSION_STRING);
   PUTS(BOARD_STRING);

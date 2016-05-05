@@ -554,8 +554,13 @@ char coap_msg[255];
      }
     }
     else if(((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
-     printf("Onboard button middle button press!\n\r");
-
+      printf("Onboard button middle button press!\n\r");
+      printf("Erasing flash 2nd region...\n\r");
+      watchdog_periodic();
+      INTERRUPTS_DISABLE();
+      rom_util_page_erase(0x23e000, 124*2048);
+      INTERRUPTS_ENABLE();
+      printf("Erasing flash 2nd OK\n\r");
 //     dim_chan0.thyristor_open_time--;
 //     dim_chan0.Tconst++;
 //     PRINTF("Dimmer open time: %u\n\r", dim_chan0.thyristor_open_time);
@@ -711,6 +716,8 @@ PROCESS_THREAD(er_example_server, ev, data)
   PRINTF("LL header: %u\n", UIP_LLH_LEN);
   PRINTF("IP+UDP header: %u\n", UIP_IPUDPH_LEN);
   PRINTF("REST max chunk: %u\n", REST_MAX_CHUNK_SIZE);
+
+  PRINTF("VTOR: %u\n", *( uint32_t *)0xE000ED08);
 
   /* receives all CoAP messages */
 //  coap_init_engine();

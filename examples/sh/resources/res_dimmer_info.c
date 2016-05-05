@@ -6,6 +6,7 @@
 #include "rest-engine.h"
 #include "sh_main.h"
 #include "dev/rom-util.h"
+#include "cpu.h"
 
 extern const char device_name;
 extern const char device_firmware;
@@ -63,7 +64,10 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
      PRINTF("mode %s\n", mode);
      if (atoi(mode) == 1) {
        PRINTF("Erase flash...\n");
-       rom_util_page_erase(0x278000, 26*1024);
+       watchdog_periodic();
+       INTERRUPTS_DISABLE();
+       rom_util_page_erase(0x23e000, 124*2048);
+       INTERRUPTS_ENABLE();
        EnableFirmwareUpdate = 0;
        REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "EnableFirmwareUpdate=1"));
      }
