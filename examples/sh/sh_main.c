@@ -555,6 +555,7 @@ char coap_msg[255];
     }
     else if(((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
       printf("Onboard button middle button press!\n\r");
+      PRINTF("Address 0x200004: %x \n\r ", *(uint32_t *)0x200004);
       printf("Erasing flash 2nd region...\n\r");
       watchdog_periodic();
       INTERRUPTS_DISABLE();

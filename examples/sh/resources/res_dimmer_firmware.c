@@ -11,6 +11,7 @@
 
 #define MAX_PLUGFEST_PAYLOAD 64 + 1       /* +1 for the terminating zero, which is not transmitted */
 #define FIRMWARE_SIZE  65535
+#define CHUNKS_TOTAL    1024*512
 
 extern sh_dimmer_t dim_chan0;
 static int32_t large_update_size = 0;
@@ -34,14 +35,26 @@ uint32_t calc4summ(uint32_t *ptr, uint16_t count) {
 
 
 static void res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
+static void res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
+static void res_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
 RESOURCE(res_dimmer_firmware,
          "title=\"Update firmware\";rt=\"Control\"",
-         NULL,
-         NULL,
+         res_get_handler,
+         res_post_handler,
          res_put_handler,
          NULL);
 
+
+static void
+res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
+{
+
+
+PRINTF("calc4summ: %x\n\r", calc4summ(0x23e000, 65536 >> 2));
+
+
+}
 static void
 res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
@@ -106,5 +119,48 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
     const char *error_msg = "NoPayload";
     REST.set_response_payload(response, error_msg, strlen(error_msg));
     return;
+  }
+}
+
+static void
+res_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
+{
+  int32_t strpos = 0;
+
+  /* Check the offset for boundaries of the resource data. */
+  if(*offset >= CHUNKS_TOTAL) {
+    REST.set_response_status(response, REST.status.BAD_OPTION);
+    /* A block error message should not exceed the minimum block size (16). */
+
+    const char *error_msg = "BlockOutOfScope";
+    REST.set_response_payload(response, error_msg, strlen(error_msg));
+    return;
+  }
+
+  /* Generate data until reaching CHUNKS_TOTAL. */
+//  while(strpos < preferred_size) {
+//    strpos += snprintf((char *)buffer + strpos, preferred_size - strpos + 1, "|%ld|", *offset);
+//  }
+
+   printf("preferred size: %d, offset: %d", preferred_size, *offset);
+   memcpy(buffer, 0x200000 + (*offset), preferred_size);
+   strpos = preferred_size;
+
+  /* snprintf() does not adjust return value if truncated by size. */
+  if(strpos > preferred_size) {
+    strpos = preferred_size;
+    /* Truncate if above CHUNKS_TOTAL bytes. */
+  }
+  if(*offset + (int32_t)strpos > CHUNKS_TOTAL) {
+    strpos = CHUNKS_TOTAL - *offset;
+  }
+  REST.set_response_payload(response, buffer, strpos);
+
+  /* IMPORTANT for chunk-wise resources: Signal chunk awareness to REST engine. */
+  *offset += strpos;
+
+  /* Signal end of resource representation. */
+  if(*offset >= CHUNKS_TOTAL) {
+    *offset = -1;
   }
 }

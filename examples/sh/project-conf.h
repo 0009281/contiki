@@ -65,7 +65,7 @@
 #define UIP_CONF_TCP                   0
 
 #undef NETSTACK_CONF_MAC
-#define NETSTACK_CONF_MAC     nullmac_driver
+#define NETSTACK_CONF_MAC     csma_driver
 
 /* Increase rpl-border-router IP-buffer when using more than 64. */
 #undef REST_MAX_CHUNK_SIZE
@@ -93,6 +93,8 @@
 #undef COAP_PROXY_OPTION_PROCESSING
 #define COAP_PROXY_OPTION_PROCESSING   0
 
+#undef COAP_MAX_BLOCK_SIZE
+#define COAP_MAX_BLOCK_SIZE 512
 /* Enable client-side support for COAP observe */
 #define COAP_OBSERVE_CLIENT 1
 #endif /* __PROJECT_ERBIUM_CONF_H__ */
