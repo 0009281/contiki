@@ -7,13 +7,14 @@
 #include "sh_main.h"
 #include "er-coap.h"
 #include "dev/rom-util.h"
+#include "cpu.h"
 
 
 #define MAX_PLUGFEST_PAYLOAD 64 + 1       /* +1 for the terminating zero, which is not transmitted */
-#define FIRMWARE_SIZE  65535
+#define FIRMWARE_SIZE  65535 + 512
 #define CHUNKS_TOTAL    1024*512
 
-extern sh_dimmer_t dim_chan0;
+extern sh_dimmer_t dim_chan02;
 static int32_t large_update_size = 0;
 static uint8_t large_update_store[4096] = { 0 };
 static struct etimer  firmware_erase_timer;
@@ -51,7 +52,7 @@ res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t prefer
 {
 
 
-PRINTF("calc4summ: %x\n\r", calc4summ(0x23e000, 65536 >> 2));
+PRINTF("calc4summ: %x\n\r", calc4summ(0x23e000, (FIRMWARE_SIZE >> 2)-1));
 
 
 }
@@ -61,7 +62,7 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
   coap_packet_t *const coap_req = (coap_packet_t *)request;
   uint8_t *incoming = NULL;
   size_t len = 0;
-
+  uint16_t i;
   unsigned int ct = -1;
 //preferred_size, *offset only for GEt method!!!
 
@@ -97,8 +98,10 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 //      memcpy(large_update_store + coap_req->block1_num * coap_req->block1_size,        incoming, len);
 //      large_update_size = coap_req->block1_num * coap_req->block1_size + len;
 //      large_update_ct = ct;
+      INTERRUPTS_DISABLE();
       rom_util_program_flash(incoming, 0x23e000 + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
-
+      INTERRUPTS_ENABLE();
+//      for (i=0; i< coap_req->block1_size;i++ ) PRINTF("%02x ", incoming[i]);
 
       if (!coap_req->block1_more) REST.set_response_status(response, REST.status.CHANGED);
         else        coap_set_status_code(response, CONTINUE_2_31);

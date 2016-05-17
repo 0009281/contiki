@@ -69,7 +69,13 @@
 
 /* Increase rpl-border-router IP-buffer when using more than 64. */
 #undef REST_MAX_CHUNK_SIZE
-#define REST_MAX_CHUNK_SIZE            48
+#define REST_MAX_CHUNK_SIZE            512
+
+#undef UIP_CONF_BUFFER_SIZE
+#define UIP_CONF_BUFFER_SIZE				1280
+
+#undef UART0_CONF_BAUD_RATE
+#define UART0_CONF_BAUD_RATE   57600
 
 /* Estimate your header size, especially when using Proxy-Uri. */
 /*
