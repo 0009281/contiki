@@ -8,11 +8,14 @@
 #include "er-coap.h"
 #include "dev/rom-util.h"
 #include "cpu.h"
+#include "cc2538-dev.h"
 
 
 #define MAX_PLUGFEST_PAYLOAD 64 + 1       /* +1 for the terminating zero, which is not transmitted */
 #define FIRMWARE_SIZE  65535 + 512
 #define CHUNKS_TOTAL    1024*512
+#define VTOR    *( uint32_t *)0xE000ED08
+//#define VTOR    0xE000ED08
 
 extern sh_dimmer_t dim_chan02;
 static int32_t large_update_size = 0;
@@ -61,9 +64,12 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 {
   coap_packet_t *const coap_req = (coap_packet_t *)request;
   uint8_t *incoming = NULL;
+  uint32_t ver_crc[2];
+
   size_t len = 0;
   uint16_t i;
   unsigned int ct = -1;
+  uint32_t firmware_base;
 //preferred_size, *offset only for GEt method!!!
 
 
@@ -78,11 +84,14 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 
   if((len = REST.get_request_payload(request, (const uint8_t **)&incoming))) {
 
+      if (VTOR == 0x200000) firmware_base = 0x23e000;
+        else firmware_base=0x200000;
       printf("block number: %d\n", coap_req->block1_num);
       printf("block size: %d\n", coap_req->block1_size);
       printf("preferred size: %d\n", preferred_size);
       printf("len: %d\n", len);
       printf("offset: %d\n", *offset);
+      printf("firmware_base: %x\n", firmware_base);
 /*    if((coap_req->block1_num >= 10)) {
       printf("Start flash erasing!\n");
 //      etimer_set(&firmware_erase_timer, CLOCK_SECOND/100);
@@ -94,17 +103,41 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
       return;
     }
 */
-    if(coap_req->block1_num * coap_req->block1_size + len <= FIRMWARE_SIZE) {
+    if(coap_req->block1_num * coap_req->block1_size + len <= CC2538_DEV_FLASH_SIZE) {
 //      memcpy(large_update_store + coap_req->block1_num * coap_req->block1_size,        incoming, len);
 //      large_update_size = coap_req->block1_num * coap_req->block1_size + len;
 //      large_update_ct = ct;
-      INTERRUPTS_DISABLE();
-      rom_util_program_flash(incoming, 0x23e000 + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
-      INTERRUPTS_ENABLE();
+
+
 //      for (i=0; i< coap_req->block1_size;i++ ) PRINTF("%02x ", incoming[i]);
 
-      if (!coap_req->block1_more) REST.set_response_status(response, REST.status.CHANGED);
-        else        coap_set_status_code(response, CONTINUE_2_31);
+      if (!coap_req->block1_more) {
+        INTERRUPTS_DISABLE();
+        rom_util_program_flash(incoming, firmware_base + coap_req->block1_num * coap_req->block1_size,  len - 4);
+        INTERRUPTS_ENABLE();
+        PRINTF("calc4summ: %x\n\r", 0 - calc4summ(firmware_base, ((coap_req->block1_num * coap_req->block1_size + len) >> 2)-1));        
+        ver_crc[0]= *( uint32_t *)(*( uint32_t *)(0xE000ED08) + (CC2538_DEV_FLASH_SIZE >> 1) - 8192 - 8);
+	ver_crc[0] += 1;
+
+        INTERRUPTS_DISABLE();
+        rom_util_program_flash(&ver_crc[0], firmware_base + (CC2538_DEV_FLASH_SIZE>>1) -8192 -8,  4);
+        INTERRUPTS_ENABLE();
+
+	ver_crc[1] = 0 - calc4summ(firmware_base, (((CC2538_DEV_FLASH_SIZE>>1)-8192) >> 2)-1); 
+        PRINTF("ver new: %x\n\r", ver_crc[0]);
+        PRINTF("crc new: %x\n\r", ver_crc[1]);
+        INTERRUPTS_DISABLE();
+        rom_util_program_flash(&ver_crc[1], firmware_base + (CC2538_DEV_FLASH_SIZE>>1) -8192 -4,  4);
+        INTERRUPTS_ENABLE();
+
+        REST.set_response_status(response, REST.status.CHANGED);
+      }
+      else {
+        INTERRUPTS_DISABLE();
+        rom_util_program_flash(incoming, firmware_base + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
+        INTERRUPTS_ENABLE();
+        coap_set_status_code(response, CONTINUE_2_31);
+      }
 
       coap_set_header_block1(response, coap_req->block1_num, 0, coap_req->block1_size);
     } else {

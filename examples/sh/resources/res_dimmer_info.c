@@ -59,14 +59,19 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
   const char *mode = NULL;
   uint8_t led = 0;
   int success = 1;
+  uint32_t firmware_base;
+#define VTOR    *( uint32_t *)0xE000ED08
 
    if(len = REST.get_post_variable(request, "EnableFirmwareUpdate", &mode)) {
      PRINTF("mode %s\n", mode);
      if (atoi(mode) == 1) {
        PRINTF("Erase flash...\n");
+       if (VTOR == 0x200000) firmware_base = 0x23e000;
+         else firmware_base=0x200000;
+
        watchdog_periodic();
        INTERRUPTS_DISABLE();
-       rom_util_page_erase(0x23e000, 124*2048);
+       rom_util_page_erase(firmware_base, 124*2048);
        INTERRUPTS_ENABLE();
        EnableFirmwareUpdate = 0;
        REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "EnableFirmwareUpdate=1"));

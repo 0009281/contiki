@@ -718,7 +718,7 @@ PROCESS_THREAD(er_example_server, ev, data)
   PRINTF("IP+UDP header: %u\n", UIP_IPUDPH_LEN);
   PRINTF("REST max chunk: %u\n", REST_MAX_CHUNK_SIZE);
 
-  PRINTF("VTOR: %u\n", *( uint32_t *)0xE000ED08);
+  PRINTF("VTOR: %x\n", *( uint32_t *)0xE000ED08);
 
   /* receives all CoAP messages */
 //  coap_init_engine();
