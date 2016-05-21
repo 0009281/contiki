@@ -1,0 +1,7 @@
+cp ~/contiki/cpu/cc2538/dev/cc2538-dev-200000.h ~/contiki/cpu/cc2538/dev/cc2538-dev.h
+make TARGET=sh
+cp sh_main.bin sh_main_200000.bin
+
+cp ~/contiki/cpu/cc2538/dev/cc2538-dev-23e000.h ~/contiki/cpu/cc2538/dev/cc2538-dev.h
+make TARGET=sh
+cp sh_main.bin sh_main_23e000.bin

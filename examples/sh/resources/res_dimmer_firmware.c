@@ -103,7 +103,7 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
       return;
     }
 */
-    if(coap_req->block1_num * coap_req->block1_size + len <= CC2538_DEV_FLASH_SIZE) {
+    if(coap_req->block1_num * coap_req->block1_size + len <= (CC2538_DEV_FLASH_SIZE>>1)-8192) {
 //      memcpy(large_update_store + coap_req->block1_num * coap_req->block1_size,        incoming, len);
 //      large_update_size = coap_req->block1_num * coap_req->block1_size + len;
 //      large_update_ct = ct;
@@ -112,27 +112,43 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 //      for (i=0; i< coap_req->block1_size;i++ ) PRINTF("%02x ", incoming[i]);
 
       if (!coap_req->block1_more) {
+//write last block minus version and CRC
         INTERRUPTS_DISABLE();
         rom_util_program_flash(incoming, firmware_base + coap_req->block1_num * coap_req->block1_size,  len - 4);
         INTERRUPTS_ENABLE();
         PRINTF("calc4summ: %x\n\r", 0 - calc4summ(firmware_base, ((coap_req->block1_num * coap_req->block1_size + len) >> 2)-1));        
-        ver_crc[0]= *( uint32_t *)(*( uint32_t *)(0xE000ED08) + (CC2538_DEV_FLASH_SIZE >> 1) - 8192 - 8);
+        ver_crc[0] = *( uint32_t *)(VTOR + (CC2538_DEV_FLASH_SIZE >> 1) - 8192 - 8);
 	ver_crc[0] += 1;
-
+//write version
         INTERRUPTS_DISABLE();
         rom_util_program_flash(&ver_crc[0], firmware_base + (CC2538_DEV_FLASH_SIZE>>1) -8192 -8,  4);
         INTERRUPTS_ENABLE();
-
+//calculate CRC
 	ver_crc[1] = 0 - calc4summ(firmware_base, (((CC2538_DEV_FLASH_SIZE>>1)-8192) >> 2)-1); 
         PRINTF("ver new: %x\n\r", ver_crc[0]);
         PRINTF("crc new: %x\n\r", ver_crc[1]);
-        INTERRUPTS_DISABLE();
-        rom_util_program_flash(&ver_crc[1], firmware_base + (CC2538_DEV_FLASH_SIZE>>1) -8192 -4,  4);
-        INTERRUPTS_ENABLE();
-
-        REST.set_response_status(response, REST.status.CHANGED);
+        PRINTF("crc received: %x\n\r", *( uint32_t *)&incoming[len-4]);
+//TODO!!!
+//if CRC new != CRC recieved then retaurn failure and skip CRC writing to the flash.
+        if (ver_crc[1]==*( uint32_t *)&incoming[len-4]) {
+          INTERRUPTS_DISABLE();
+          rom_util_program_flash(&ver_crc[1], firmware_base + (CC2538_DEV_FLASH_SIZE>>1) -8192 -4,  4);
+          INTERRUPTS_ENABLE();
+          REST.set_response_status(response, REST.status.CHANGED);
+        }
+        else {
+          REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "CRC error"));
+          REST.set_response_status(response, REST.status.NOT_MODIFIED);
+       }
       }
       else {
+//clear flash page
+        if (!(firmware_base + coap_req->block1_num * coap_req->block1_size) % 2048) {
+         INTERRUPTS_DISABLE();
+         rom_util_page_erase(firmware_base + coap_req->block1_num * coap_req->block1_size, 2048);
+         INTERRUPTS_ENABLE();
+        }
+//program next part of the incoming data to flash memory
         INTERRUPTS_DISABLE();
         rom_util_program_flash(incoming, firmware_base + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
         INTERRUPTS_ENABLE();
@@ -141,8 +157,7 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 
       coap_set_header_block1(response, coap_req->block1_num, 0, coap_req->block1_size);
     } else {
-      REST.set_response_status(response,
-                               REST.status.REQUEST_ENTITY_TOO_LARGE);
+      REST.set_response_status(response, REST.status.REQUEST_ENTITY_TOO_LARGE);
       REST.set_response_payload(
         response,
         buffer,
