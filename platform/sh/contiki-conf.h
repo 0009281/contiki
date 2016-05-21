@@ -471,11 +471,6 @@ typedef uint32_t rtimer_clock_t;
 
 
 
-//  addr_contexts[0].prefix[0] = UIP_DS6_DEFAULT_PREFIX_0; \
-//  addr_contexts[0].prefix[1] = UIP_DS6_DEFAULT_PREFIX_1; \
-//  addr_contexts[0].prefix[0] = 0xaa; \
-//  addr_contexts[0].prefix[1] = 0xaa; \
-
 
 /* Define our IPv6 prefixes/contexts here */
 #define SICSLOWPAN_CONF_MAX_ADDR_CONTEXTS    1

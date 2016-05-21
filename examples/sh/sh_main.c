@@ -27,7 +27,7 @@
 
 #include "sh_main.h"
 #include "er-coap-engine.h"
-
+#include "ip64-addr.h"
 
 static struct etimer  dimmer_timer;
 static uint32_t current_sensor_iteration,  current_sensor_value_max, pwr;
@@ -46,7 +46,7 @@ uint32_t dimmer_current_state=0;
 
 extern resource_t  res_toggle, res_dimmer_toggle, res_dimmer_cycle_start, res_dimmer_stop, res_dimmer_on,  res_dimmer_off,
                    res_dimmer_set_brightness, res_dimmer_get_status, res_dimmer_get_info, res_dimmer_up_start, res_dimmer_down_start,
-                   res_dimmer_firmware;
+                   res_dimmer_firmware, res_sh_reboot;
 
 sh_dimmer_t dim_chan0;
 
@@ -159,7 +159,7 @@ static sh_dimmer_t *dim;
   GPIO_SET_OUTPUT(GPIO_C_BASE, 0x4);
 
   GPIO_SET_INPUT(GPIO_A_BASE, 0x40);
-  ioc_set_over(GPIO_A_BASE, 6, IOC_OVERRIDE_PUE);
+  ioc_set_over(0, 6, IOC_OVERRIDE_PUE);
 
 //  GPIO_SET_INPUT(GPIO_C_BASE, 0x10); //button
 
@@ -485,7 +485,7 @@ PROCESS_THREAD(current_sensor_process, ev, data)
           printf("Current sensor v2alue = %ld.%03u A \n\r",  (long)(temp_current_sensor_value), (unsigned)((temp_current_sensor_value-floor(temp_current_sensor_value))*1000));
 //          printf("Current sensor value = %ld.%03u A \n\r", /*current_sensor_value/4096*/ (long)sqrt(current_sensor_value/4096), (unsigned)sqrt(((current_sensor_value/4096-floor(current_sensor_value/4096))*1000)));
 //          printf("Current sensor value = %ld.%03u A \n\r", /*current_sensor_value/4096*/ (long)current_sensor_value/1000, (unsigned)((current_sensor_value/1000-floor(current_sensor_value/1000))*1000));
-          printf("Max Iout = %d V\n\r, Average V = %d\n\r", current_sensor_value_max, pwr_sum/4096);
+          printf("Max Iout = %ld V\n\r, Average V = %ld\n\r", current_sensor_value_max, (uint32_t)pwr_sum/4096);
 //          printf("Temperature = %d mC\n",  cc2538_temp_sensor.value(CC2538_SENSORS_VALUE_TYPE_CONVERTED));
 	    current_sensor_iteration=0;
 	    current_sensor_value=0;
@@ -518,12 +518,12 @@ PROCESS_THREAD(btn_process, ev, data)
   uip_ip4addr_t ip4addr;
   uip_ip6addr_t server_ipaddr;
 
-  static uint32_t pwr;
+//  static uint32_t pwr;
 //  static   uip_ipaddr_t server_ipaddr;
   static coap_packet_t request[1];      /* This way the packet can be treated as pointer as usual. */
 /* leading and ending slashes only for demo purposes, get cropped automatically when setting the Uri-Path */
-char *service_urls[NUMBER_OF_URLS] =
-{ ".well-known/core", "/buttons/toggle", "battery/", "error/in//path" };
+//char *service_urls[NUMBER_OF_URLS] =
+//{ ".well-known/core", "/buttons/toggle", "battery/", "error/in//path" };
 
 char coap_msg[255];
 
@@ -555,9 +555,8 @@ char coap_msg[255];
     }
     else if(((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) > CLOCK_SECOND*0.7) && ((&button_onboard_sensor)->value(BUTTON_SENSOR_VALUE_DURATION) <CLOCK_SECOND*3)) {
       printf("Onboard button middle button press!\n\r");
-      PRINTF("Address 0x200004: %x \n\r ", *(uint32_t *)0x200004);
+      PRINTF("Address 0x200004: %lx \n\r ", *(uint32_t *)0x200004);
       printf("Erasing flash 2nd region...\n\r");
-      watchdog_periodic();
       INTERRUPTS_DISABLE();
       rom_util_page_erase(0x23e000, 124*2048);
       INTERRUPTS_ENABLE();
@@ -718,7 +717,7 @@ PROCESS_THREAD(er_example_server, ev, data)
   PRINTF("IP+UDP header: %u\n", UIP_IPUDPH_LEN);
   PRINTF("REST max chunk: %u\n", REST_MAX_CHUNK_SIZE);
 
-  PRINTF("VTOR: %x\n", *( uint32_t *)0xE000ED08);
+  PRINTF("VTOR: %lx\n", *( uint32_t *)0xE000ED08);
 
   /* receives all CoAP messages */
 //  coap_init_engine();
@@ -744,6 +743,7 @@ PROCESS_THREAD(er_example_server, ev, data)
   rest_activate_resource(&res_dimmer_get_status, "dimmer/status");
   rest_activate_resource(&res_dimmer_get_info, "dimmer/info");
   rest_activate_resource(&res_dimmer_firmware, "dimmer/firmware");
+  rest_activate_resource(&res_sh_reboot, "dimmer/reboot");
 
   /* Define application-specific events here. */
   while(1) {

@@ -11,16 +11,16 @@
 #include "cc2538-dev.h"
 
 
-#define MAX_PLUGFEST_PAYLOAD 64 + 1       /* +1 for the terminating zero, which is not transmitted */
+//#define MAX_PLUGFEST_PAYLOAD 64 + 1       /* +1 for the terminating zero, which is not transmitted */
 #define FIRMWARE_SIZE  65535 + 512
 #define CHUNKS_TOTAL    1024*512
 #define VTOR    *( uint32_t *)0xE000ED08
 //#define VTOR    0xE000ED08
 
 extern sh_dimmer_t dim_chan02;
-static int32_t large_update_size = 0;
-static uint8_t large_update_store[4096] = { 0 };
-static struct etimer  firmware_erase_timer;
+//static int32_t large_update_size = 0;
+//static uint8_t large_update_store[4096] = { 0 };
+//static struct etimer  firmware_erase_timer;
 
 //static unsigned int large_update_ct = APPLICATION_OCTET_STREAM;
 
@@ -64,111 +64,111 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 {
   coap_packet_t *const coap_req = (coap_packet_t *)request;
   uint8_t *incoming = NULL;
-  uint32_t ver_crc[2];
-
   size_t len = 0;
-  uint16_t i;
-  unsigned int ct = -1;
-  uint32_t firmware_base;
-//preferred_size, *offset only for GEt method!!!
+  uint32_t firmware_new_base, crc_received_packet, start_firmware_vector, firmware_new_ver, firmware_new_crc;
 
 
-/*
-  if(!REST.get_header_content_type(request, &ct)) {
-    REST.set_response_status(response, REST.status.BAD_REQUEST);
-    const char *error_msg = "NoContentType";
-    REST.set_response_payload(response, error_msg, strlen(error_msg));
-    return;
-  }
-*/
-
+//check if payload lenght is not zero
   if((len = REST.get_request_payload(request, (const uint8_t **)&incoming))) {
 
-      if (VTOR == 0x200000) firmware_base = 0x23e000;
-        else firmware_base=0x200000;
-      printf("block number: %d\n", coap_req->block1_num);
-      printf("block size: %d\n", coap_req->block1_size);
-      printf("preferred size: %d\n", preferred_size);
-      printf("len: %d\n", len);
-      printf("offset: %d\n", *offset);
-      printf("firmware_base: %x\n", firmware_base);
-/*    if((coap_req->block1_num >= 10)) {
-      printf("Start flash erasing!\n");
-//      etimer_set(&firmware_erase_timer, CLOCK_SECOND/100);
-//      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&firmware_erase_timer));
-//      while (!etimer_expired(&firmware_erase_timer));
-      coap_set_status_code(response, CONTINUE_2_31);
-      coap_set_header_block1(response, coap_req->block1_num, 1, coap_req->block1_size);
-//      REST.set_response_payload(response, buffer, snprintf((char *)buffer, MAX_PLUGFEST_PAYLOAD, "Wait 0 %d\n",0));
-      return;
+      if (VTOR == 0x200000) firmware_new_base = 0x23e000; else firmware_new_base=0x200000;
+      PRINTF("block number: %d\n", coap_req->block1_num);
+      PRINTF("block size: %d\n", coap_req->block1_size);
+      PRINTF("preferred size: %d\n", preferred_size);
+      PRINTF("len: %d\n", len);
+      PRINTF("offset: %d\n", *offset);
+      PRINTF("current firmware location(VTOR): %lx\n", VTOR);
+      PRINTF("new firmware location: %lx\n", firmware_new_base);
+
+//check start-up vector in the new firmware if fits in other flash part, not in the current
+    if (!coap_req->block1_num) {
+      start_firmware_vector = *( uint32_t *)&incoming[4];
+      if ( !((start_firmware_vector > firmware_new_base) && (start_firmware_vector < (firmware_new_base + (CC2538_DEV_FLASH_SIZE>>1) - 8192)))) {
+        printf("firmware_start_vetor: %lx\n", *( uint32_t *)&incoming[4]);
+        PRINTF("Wrong firmware\n");
+        REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "Wrong firmware"));
+        REST.set_response_status(response, REST.status.NOT_ACCEPTABLE);
+        return;
+      }
     }
-*/
+
+    //check if amount of inboud data is fit in the flash
     if(coap_req->block1_num * coap_req->block1_size + len <= (CC2538_DEV_FLASH_SIZE>>1)-8192) {
-//      memcpy(large_update_store + coap_req->block1_num * coap_req->block1_size,        incoming, len);
-//      large_update_size = coap_req->block1_num * coap_req->block1_size + len;
-//      large_update_ct = ct;
-
-
-//      for (i=0; i< coap_req->block1_size;i++ ) PRINTF("%02x ", incoming[i]);
+      //for (i=0; i< coap_req->block1_size;i++ ) PRINTF("%02x ", incoming[i]); //print block that has receied
 
       if (!coap_req->block1_more) {
-//write last block minus version and CRC
+        //do we need to clear page for last data in the coap receiving data?
+        if (!((firmware_new_base + coap_req->block1_num * coap_req->block1_size) % 2048)) {
+         PRINTF("Erase last packet page(2048 bytes) at address: %lx\n\r", firmware_new_base + coap_req->block1_num * coap_req->block1_size);
+         INTERRUPTS_DISABLE();
+         rom_util_page_erase(firmware_new_base + coap_req->block1_num * coap_req->block1_size, 2048);
+         INTERRUPTS_ENABLE();
+        }
+
+        //write last block minus CRC
         INTERRUPTS_DISABLE();
-        rom_util_program_flash(incoming, firmware_base + coap_req->block1_num * coap_req->block1_size,  len - 4);
+        rom_util_program_flash(incoming, firmware_new_base + coap_req->block1_num * coap_req->block1_size,  len - 4);
         INTERRUPTS_ENABLE();
-        PRINTF("calc4summ: %x\n\r", 0 - calc4summ(firmware_base, ((coap_req->block1_num * coap_req->block1_size + len) >> 2)-1));        
-        ver_crc[0] = *( uint32_t *)(VTOR + (CC2538_DEV_FLASH_SIZE >> 1) - 8192 - 8);
-	ver_crc[0] += 1;
-//write version
-        INTERRUPTS_DISABLE();
-        rom_util_program_flash(&ver_crc[0], firmware_base + (CC2538_DEV_FLASH_SIZE>>1) -8192 -8,  4);
-        INTERRUPTS_ENABLE();
-//calculate CRC
-	ver_crc[1] = 0 - calc4summ(firmware_base, (((CC2538_DEV_FLASH_SIZE>>1)-8192) >> 2)-1); 
-        PRINTF("ver new: %x\n\r", ver_crc[0]);
-        PRINTF("crc new: %x\n\r", ver_crc[1]);
-        PRINTF("crc received: %x\n\r", *( uint32_t *)&incoming[len-4]);
-//TODO!!!
-//if CRC new != CRC recieved then retaurn failure and skip CRC writing to the flash.
-        if (ver_crc[1]==*( uint32_t *)&incoming[len-4]) {
+        //calculate CRC of the new firmware that was ceceived
+        crc_received_packet = 0 - calc4summ(firmware_new_base, ((coap_req->block1_num * coap_req->block1_size + len) >> 2)-1);
+        PRINTF("CRC of all data that have received: %lx\n\r", crc_received_packet);
+        PRINTF("CRC that received: %lx\n\r", *( uint32_t *)&incoming[len-4]);
+        //if received data is correct, then calculate new CRC, new version number and write it to the end of firmware flash
+        if (crc_received_packet == *( uint32_t *)&incoming[len-4]) {
+          firmware_new_ver = *( uint32_t *)(VTOR + (CC2538_DEV_FLASH_SIZE >> 1) - 8192 - 8);
+          firmware_new_ver += 1;
+
+          PRINTF("Erase flash page where version&crc is located at address: %lx\n\r", firmware_new_base + (CC2538_DEV_FLASH_SIZE>>1) - 8192 - 2048);
           INTERRUPTS_DISABLE();
-          rom_util_program_flash(&ver_crc[1], firmware_base + (CC2538_DEV_FLASH_SIZE>>1) -8192 -4,  4);
+          rom_util_page_erase(firmware_new_base + (CC2538_DEV_FLASH_SIZE>>1) - 8192 - 2048, 2048);
           INTERRUPTS_ENABLE();
+
+          //write version
+          INTERRUPTS_DISABLE();
+          rom_util_program_flash(&firmware_new_ver, firmware_new_base + (CC2538_DEV_FLASH_SIZE>>1) - 8192 - 8,  4);
+          INTERRUPTS_ENABLE();
+          //calculate CRC (received through COAP firmware and other 0xFF until end of firmware flash
+          firmware_new_crc = 0 - calc4summ(firmware_new_base, (((CC2538_DEV_FLASH_SIZE>>1)-8192) >> 2)-1); 
+          PRINTF("ver new: %lx\n\r", firmware_new_ver);
+          PRINTF("crc new: %lx\n\r", firmware_new_crc);
+
+          INTERRUPTS_DISABLE();
+          rom_util_program_flash(&firmware_new_crc, firmware_new_base + (CC2538_DEV_FLASH_SIZE>>1) -8192 -4,  4);
+          INTERRUPTS_ENABLE();
+          REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "Firmware updating succeed"));
           REST.set_response_status(response, REST.status.CHANGED);
+
         }
         else {
           REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "CRC error"));
           REST.set_response_status(response, REST.status.NOT_MODIFIED);
-       }
+        }
       }
       else {
-//clear flash page
-        if (!(firmware_base + coap_req->block1_num * coap_req->block1_size) % 2048) {
+        //clear flash page
+        if (!((firmware_new_base + coap_req->block1_num * coap_req->block1_size) % 2048)) {
+         PRINTF("Erase page(2048 bytes) at address: %lx\n\r", firmware_new_base + coap_req->block1_num * coap_req->block1_size);
          INTERRUPTS_DISABLE();
-         rom_util_page_erase(firmware_base + coap_req->block1_num * coap_req->block1_size, 2048);
+         rom_util_page_erase(firmware_new_base + coap_req->block1_num * coap_req->block1_size, 2048);
          INTERRUPTS_ENABLE();
         }
-//program next part of the incoming data to flash memory
+        //program next part of the incoming data to flash memory
         INTERRUPTS_DISABLE();
-        rom_util_program_flash(incoming, firmware_base + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
+        rom_util_program_flash(incoming, firmware_new_base + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
         INTERRUPTS_ENABLE();
         coap_set_status_code(response, CONTINUE_2_31);
       }
 
       coap_set_header_block1(response, coap_req->block1_num, 0, coap_req->block1_size);
-    } else {
+    } 
+    else {
       REST.set_response_status(response, REST.status.REQUEST_ENTITY_TOO_LARGE);
-      REST.set_response_payload(
-        response,
-        buffer,
-        snprintf((char *)buffer, MAX_PLUGFEST_PAYLOAD, "%uB max.",
-                 sizeof(large_update_store)));
+      REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "Size is %lx bytes max.", (CC2538_DEV_FLASH_SIZE>>1) - 8192));
       return;
     }
   } else {
+    REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "NoPayload"));
     REST.set_response_status(response, REST.status.BAD_REQUEST);
-    const char *error_msg = "NoPayload";
-    REST.set_response_payload(response, error_msg, strlen(error_msg));
     return;
   }
 }
@@ -193,7 +193,7 @@ res_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 //    strpos += snprintf((char *)buffer + strpos, preferred_size - strpos + 1, "|%ld|", *offset);
 //  }
 
-   printf("preferred size: %d, offset: %d", preferred_size, *offset);
+   printf("preferred size: %d, offset: %ld", preferred_size, *offset);
    memcpy(buffer, 0x200000 + (*offset), preferred_size);
    strpos = preferred_size;
 

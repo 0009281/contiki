@@ -1,0 +1,7 @@
+open 192.168.56.1
+user anonymous 1
+cd firmware_ota_prepare
+bin
+put sh_main_200000.bin
+put sh_main_23e000.bin
+bye

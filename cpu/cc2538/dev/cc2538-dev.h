@@ -94,14 +94,14 @@
  */
 /** Flash address */
 // moroz >>
-#define CC2538_DEV_FLASH_ADDR   0x00200000
-//#define CC2538_DEV_FLASH_ADDR   0x0023E000
+//#define CC2538_DEV_FLASH_ADDR   0x00200000
+#define CC2538_DEV_FLASH_ADDR   0x0023E000
 // << moroz
 /** Flash size in bytes */
 // moroz >>
-//#define CC2538_DEV_FLASH_SIZE   (((CC2538_DEV & CC2538_DEV_FLASH_SIZE_KB_M) >> \
-//                                  CC2538_DEV_FLASH_SIZE_KB_S) << 10)
-#define CC2538_DEV_FLASH_SIZE 0x80000
+#define CC2538_DEV_FLASH_SIZE   (((CC2538_DEV & CC2538_DEV_FLASH_SIZE_KB_M) >> \
+                                  CC2538_DEV_FLASH_SIZE_KB_S) << 10)
+//#define CC2538_DEV_FLASH_SIZE 0x80000
 // << moroz
 
 
