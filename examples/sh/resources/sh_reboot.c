@@ -17,6 +17,7 @@ RESOURCE(res_sh_reboot,
          res_put_handler,
          NULL);
 
+
 static void
 res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
