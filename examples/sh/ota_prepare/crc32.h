@@ -1,5 +1,4 @@
 
-
 unsigned int crc_table[256];
 void		 crc32_init( void );
 unsigned int crc32_calc(char * pData, int nLen);
