@@ -11,18 +11,11 @@
 #include "cc2538-dev.h"
 
 
-//#define MAX_PLUGFEST_PAYLOAD 64 + 1       /* +1 for the terminating zero, which is not transmitted */
 #define FIRMWARE_SIZE  65535 + 512
 #define CHUNKS_TOTAL    1024*512
 #define VTOR    *( uint32_t *)0xE000ED08
-//#define VTOR    0xE000ED08
 
 extern sh_dimmer_t dim_chan02;
-//static int32_t large_update_size = 0;
-//static uint8_t large_update_store[4096] = { 0 };
-//static struct etimer  firmware_erase_timer;
-
-//static unsigned int large_update_ct = APPLICATION_OCTET_STREAM;
 
 
 uint32_t calc4summ(uint32_t *ptr, uint16_t count) {
@@ -53,12 +46,9 @@ RESOURCE(res_dimmer_firmware,
 static void
 res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
-
-
-PRINTF("calc4summ: %x\n\r", calc4summ(0x23e000, (FIRMWARE_SIZE >> 2)-1));
-
-
+  PRINTF("calc4summ: %x\n\r", calc4summ(0x23e000, (FIRMWARE_SIZE >> 2)-1));
 }
+
 static void
 res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
