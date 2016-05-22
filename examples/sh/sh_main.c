@@ -36,8 +36,8 @@ static double current_sensor_value, temp_current_sensor_value;
 //extern int dimming_time;
 
 
-const char device_name[]="SH Triac Dimmer";
-const char device_firmware[]="1.1";
+//const char device_name[]="SH Triac Dimmer\n\r";
+//const char device_firmware[]="1.1";
 
 
 unsigned char dimmer_command, dimmer_Lmax=30;

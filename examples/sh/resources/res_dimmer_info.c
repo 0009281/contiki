@@ -7,6 +7,8 @@
 #include "sh_main.h"
 #include "dev/rom-util.h"
 #include "cpu.h"
+#include "cc2538-dev.h"
+
 
 extern const char device_name;
 extern const char device_firmware;
@@ -35,7 +37,7 @@ res_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
   REST.get_header_accept(request, &accept);
   if(accept == -1 || accept == REST.type.TEXT_PLAIN) {
     REST.set_header_content_type(response, REST.type.TEXT_PLAIN);
-    snprintf((char *)buffer, REST_MAX_CHUNK_SIZE, "Device Type=%s&Firmware version=%s", device_name, device_firmware);
+    snprintf((char *)buffer, REST_MAX_CHUNK_SIZE, "Device Type=%s&Firmware version=%d&Active firmware=%d", BOARD_STRING, *( uint32_t *)(*( uint32_t *)0xE000ED08 + (CC2538_DEV_FLASH_SIZE>>1) - 8192 - 8) & 0xff, (*( uint32_t *)0xE000ED08==0x200000)?0:1);
 
     REST.set_response_payload(response, (uint8_t *)buffer, strlen((char *)buffer));
   } else if(accept == REST.type.APPLICATION_JSON) {

@@ -219,7 +219,7 @@
  * \name Device string used on startup
  * @{
  */
-#define BOARD_STRING "SH dimmer"
+#define BOARD_STRING "SH Triac dimmer"
 /** @} */
 
 #endif /* BOARD_H_ */
