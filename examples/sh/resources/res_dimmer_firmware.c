@@ -32,22 +32,16 @@ uint32_t calc4summ(uint32_t *ptr, uint16_t count) {
 
 
 static void res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
-static void res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 static void res_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
 RESOURCE(res_dimmer_firmware,
          "title=\"Update firmware\";rt=\"Control\"",
          res_get_handler,
-         res_post_handler,
+         NULL,
          res_put_handler,
          NULL);
 
 
-static void
-res_post_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
-{
-  PRINTF("calc4summ: %x\n\r", calc4summ(0x23e000, (FIRMWARE_SIZE >> 2)-1));
-}
 
 static void
 res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
@@ -62,11 +56,11 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
   if((len = REST.get_request_payload(request, (const uint8_t **)&incoming))) {
 
       if (VTOR == 0x200000) firmware_new_base = 0x23e000; else firmware_new_base=0x200000;
-      PRINTF("block number: %d\n", coap_req->block1_num);
+      PRINTF("block number: %ld\n", coap_req->block1_num);
       PRINTF("block size: %d\n", coap_req->block1_size);
       PRINTF("preferred size: %d\n", preferred_size);
       PRINTF("len: %d\n", len);
-      PRINTF("offset: %d\n", *offset);
+      PRINTF("offset: %ld\n", *offset);
       PRINTF("current firmware location(VTOR): %lx\n", VTOR);
       PRINTF("new firmware location: %lx\n", firmware_new_base);
 
@@ -97,10 +91,10 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 
         //write last block minus CRC
         INTERRUPTS_DISABLE();
-        rom_util_program_flash(incoming, firmware_new_base + coap_req->block1_num * coap_req->block1_size,  len - 4);
+        rom_util_program_flash((uint32_t *)incoming, firmware_new_base + coap_req->block1_num * coap_req->block1_size,  len - 4);
         INTERRUPTS_ENABLE();
         //calculate CRC of the new firmware that was ceceived
-        crc_received_packet = 0 - calc4summ(firmware_new_base, ((coap_req->block1_num * coap_req->block1_size + len) >> 2)-1);
+        crc_received_packet = 0 - calc4summ((uint32_t *)firmware_new_base, ((coap_req->block1_num * coap_req->block1_size + len) >> 2)-1);
         PRINTF("CRC of all data that have received: %lx\n\r", crc_received_packet);
         PRINTF("CRC that received: %lx\n\r", *( uint32_t *)&incoming[len-4]);
         //if received data is correct, then calculate new CRC, new version number and write it to the end of firmware flash
@@ -118,7 +112,7 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
           rom_util_program_flash(&firmware_new_ver, firmware_new_base + (CC2538_DEV_FLASH_SIZE>>1) - 8192 - 8,  4);
           INTERRUPTS_ENABLE();
           //calculate CRC (received through COAP firmware and other 0xFF until end of firmware flash
-          firmware_new_crc = 0 - calc4summ(firmware_new_base, (((CC2538_DEV_FLASH_SIZE>>1)-8192) >> 2)-1); 
+          firmware_new_crc = 0 - calc4summ((uint32_t *)firmware_new_base, (((CC2538_DEV_FLASH_SIZE>>1)-8192) >> 2)-1); 
           PRINTF("ver new: %lx\n\r", firmware_new_ver);
           PRINTF("crc new: %lx\n\r", firmware_new_crc);
 
@@ -144,7 +138,7 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
         }
         //program next part of the incoming data to flash memory
         INTERRUPTS_DISABLE();
-        rom_util_program_flash(incoming, firmware_new_base + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
+        rom_util_program_flash((uint32_t *)incoming, firmware_new_base + coap_req->block1_num * coap_req->block1_size,  coap_req->block1_size);
         INTERRUPTS_ENABLE();
         coap_set_status_code(response, CONTINUE_2_31);
       }
@@ -153,7 +147,7 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
     } 
     else {
       REST.set_response_status(response, REST.status.REQUEST_ENTITY_TOO_LARGE);
-      REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "Size is %lx bytes max.", (CC2538_DEV_FLASH_SIZE>>1) - 8192));
+      REST.set_response_payload(response, buffer, snprintf((char *)buffer, preferred_size, "Size is %x bytes max.", (CC2538_DEV_FLASH_SIZE>>1) - 8192));
       return;
     }
   } else {
@@ -184,7 +178,7 @@ res_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
 //  }
 
    printf("preferred size: %d, offset: %ld", preferred_size, *offset);
-   memcpy(buffer, 0x200000 + (*offset), preferred_size);
+   memcpy(buffer, (const void *)0x200000 + (*offset), preferred_size);
    strpos = preferred_size;
 
   /* snprintf() does not adjust return value if truncated by size. */

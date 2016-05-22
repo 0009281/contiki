@@ -37,7 +37,7 @@ res_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
   REST.get_header_accept(request, &accept);
   if(accept == -1 || accept == REST.type.TEXT_PLAIN) {
     REST.set_header_content_type(response, REST.type.TEXT_PLAIN);
-    snprintf((char *)buffer, REST_MAX_CHUNK_SIZE, "Device Type=%s&Firmware version=%d&Active firmware=%d", BOARD_STRING, *( uint32_t *)(*( uint32_t *)0xE000ED08 + (CC2538_DEV_FLASH_SIZE>>1) - 8192 - 8) & 0xff, (*( uint32_t *)0xE000ED08==0x200000)?0:1);
+    snprintf((char *)buffer, REST_MAX_CHUNK_SIZE, "Device Type=%s&Firmware version=%d&Active firmware=%d", BOARD_STRING, *( uint8_t *)(*( uint32_t *)0xE000ED08 + (CC2538_DEV_FLASH_SIZE>>1) - 8192 - 8) , (*( uint32_t *)0xE000ED08==0x200000)?0:1);
 
     REST.set_response_payload(response, (uint8_t *)buffer, strlen((char *)buffer));
   } else if(accept == REST.type.APPLICATION_JSON) {
@@ -57,10 +57,7 @@ static void
 res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   size_t len = 0;
-  const char *color = NULL;
   const char *mode = NULL;
-  uint8_t led = 0;
-  int success = 1;
   uint32_t firmware_base;
 #define VTOR    *( uint32_t *)0xE000ED08
 
@@ -71,7 +68,6 @@ res_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferr
        if (VTOR == 0x200000) firmware_base = 0x23e000;
          else firmware_base=0x200000;
 
-       watchdog_periodic();
        INTERRUPTS_DISABLE();
        rom_util_page_erase(firmware_base, 124*2048);
        INTERRUPTS_ENABLE();
