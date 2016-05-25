@@ -239,10 +239,10 @@ simistor_strob_callback(void)
 //  printf("Task called at %lu (clock = %lu)\n", rt_now, ct);
 
 
-  GPIO_SET_PIN(GPIO_C_BASE, LAMP_CHAN0);
-  clock_delay_usec(50);
+  GPIO_SET_PIN(GPIO_D_BASE, LAMP_CHAN0);
+  clock_delay_usec(1000);
 //disable simistor
-  GPIO_CLR_PIN(GPIO_C_BASE, LAMP_CHAN0);
+  GPIO_CLR_PIN(GPIO_D_BASE, LAMP_CHAN0);
 
 
 //GPIO_SET_PIN(GPIO_C_BASE, 0x80);

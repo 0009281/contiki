@@ -78,7 +78,8 @@
 #undef LEDS_RED
 #undef LEDS_CONF_ALL
 
-#define LAMP_CHAN0              0x4
+//#define LAMP_CHAN0              0x4
+#define LAMP_CHAN0              0x1
 
 #define LEDS_YELLOW             0x2 | 0x80 /**< LED2 (Yellow) -> PC1 */
 #define LEDS_GREEN              0x40 /**< LED3 (Green)  -> PC2 */
@@ -137,12 +138,12 @@
 #define BUTTON_ONBOARD_VECTOR      NVIC_INT_GPIO_PORT_C
 
 /** BUTTON_GPIO0 -> PD0 */
-#define BUTTON_GPIO0_PORT        GPIO_D_NUM
-#define BUTTON_GPIO0_PIN         1
+#define BUTTON_GPIO0_PORT        GPIO_B_NUM
+#define BUTTON_GPIO0_PIN         0
 #define BUTTON_GPIO0_VECTOR      NVIC_INT_GPIO_PORT_D
 
-/** BUTTON_GPIO1 -> PD1 */
-#define BUTTON_GPIO1_PORT        GPIO_D_NUM
+///** BUTTON_GPIO1 -> PD1 */
+#define BUTTON_GPIO1_PORT        GPIO_B_NUM
 #define BUTTON_GPIO1_PIN         0
 #define BUTTON_GPIO1_VECTOR      NVIC_INT_GPIO_PORT_D
 
@@ -152,8 +153,12 @@
 #define BUTTON_GPIO2_VECTOR      NVIC_INT_GPIO_PORT_D
 
 
-#define AC_ZERO_DETECTOR_PORT        GPIO_B_NUM
-#define AC_ZERO_DETECTOR_PIN         3
+//#define AC_ZERO_DETECTOR_PORT        GPIO_B_NUM
+//#define AC_ZERO_DETECTOR_PIN         3
+//#define AC_ZERO_DETECTOR_VECTOR      NVIC_INT_GPIO_PORT_B
+
+#define AC_ZERO_DETECTOR_PORT        GPIO_D_NUM
+#define AC_ZERO_DETECTOR_PIN         1
 #define AC_ZERO_DETECTOR_VECTOR      NVIC_INT_GPIO_PORT_B
 
 
