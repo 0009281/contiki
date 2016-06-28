@@ -353,10 +353,15 @@ uart_write_byte(uint8_t uart, uint8_t b)
   }
   uart_base = uart_regs[uart].base;
 
+  GPIO_SET_PIN(GPIO_A_BASE, 0x40);
+
   /* Block if the TX FIFO is full */
   while(REG(uart_base + UART_FR) & UART_FR_TXFF);
 
   REG(uart_base + UART_DR) = b;
+
+  clock_delay_usec(174); //for 57600: 1/57600 * 10(8 bit data + 1 start bit + 1 stop bit) 
+  GPIO_CLR_PIN(GPIO_A_BASE, 0x40); 
 }
 /*---------------------------------------------------------------------------*/
 static void

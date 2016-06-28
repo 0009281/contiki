@@ -158,9 +158,11 @@ static sh_dimmer_t *dim;
   GPIO_CLR_PIN(GPIO_D_BASE, 0x1);
   GPIO_SET_OUTPUT(GPIO_D_BASE, 0x1);
 
-  GPIO_SET_INPUT(GPIO_A_BASE, 0x40);
-  ioc_set_over(0, 6, IOC_OVERRIDE_PUE);
+//  GPIO_SET_INPUT(GPIO_A_BASE, 0x40);
+//  ioc_set_over(0, 6, IOC_OVERRIDE_PUE);
 
+
+  GPIO_SET_OUTPUT(GPIO_A_BASE, 0x40);
 //  GPIO_SET_INPUT(GPIO_C_BASE, 0x10); //button
 
 
